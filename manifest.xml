@@ -14,6 +14,7 @@
             "Monkey C: Edit Products" - Lets you add or remove any product
         -->
         <iq:products>
+            <!-- Touchscreen watches only (app relies on tap-to-select navigation) -->
             <iq:product id="approachs50"/>
             <iq:product id="approachs60"/>
             <iq:product id="approachs62"/>
@@ -61,7 +62,6 @@
             <iq:product id="epix2pro51mm"/>
             <iq:product id="etrextouch"/>
             <iq:product id="fenix5"/>
-            <iq:product id="fenix5plus"/>
             <iq:product id="fenix5s"/>
             <iq:product id="fenix5splus"/>
             <iq:product id="fenix5x"/>
@@ -84,13 +84,6 @@
             <iq:product id="fenix8pro47mm"/>
             <iq:product id="fenix8solar47mm"/>
             <iq:product id="fenix8solar51mm"/>
-            <iq:product id="fenix943mm"/>
-            <iq:product id="fenix947mm"/>
-            <iq:product id="fenix9pro43mm"/>
-            <iq:product id="fenix9pro47mm"/>
-            <iq:product id="fenix9pro51mm"/>
-            <iq:product id="fenix9prosolar47mm"/>
-            <iq:product id="fenix9prosolar51mm"/>
             <iq:product id="fenixchronos"/>
             <iq:product id="fenixe"/>
             <iq:product id="fr165"/>

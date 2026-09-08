@@ -8,7 +8,7 @@
             "program": "${workspaceFolder}/bin/info-keeper-for-garmin.prg",
             "manifest": "${workspaceFolder}/manifest.xml",
             "jungleFiles": "${workspaceFolder}/monkey.jungle",
-            "device": "fenix847mm",
+            "device": "fr970",
             "developerKeyPath": "${workspaceFolder}/developer_key.der"
         }
     ]
