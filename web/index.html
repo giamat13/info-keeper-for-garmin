@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Info Keeper Editor</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card: #1e293b;
+    --card2: #263449;
+    --accent: #38bdf8;
+    --accent2: #22c55e;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --danger: #ef4444;
+    --border: #334155;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: linear-gradient(160deg, var(--bg), #111827);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px 16px 80px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 1.6rem;
+    margin-bottom: 4px;
+  }
+  .subtitle {
+    text-align: center;
+    color: var(--muted);
+    margin-bottom: 24px;
+    font-size: 0.95rem;
+  }
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+  }
+  .card h2 {
+    margin-top: 0;
+    font-size: 1.1rem;
+    color: var(--accent);
+  }
+  button {
+    cursor: pointer;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+  .btn-add { background: var(--accent); color: #06283a; }
+  .btn-remove { background: var(--danger); color: white; padding: 6px 10px; }
+  .btn-primary {
+    background: var(--accent2);
+    color: #06280f;
+    font-size: 1rem;
+    padding: 12px 20px;
+    width: 100%;
+  }
+  .btn-secondary {
+    background: var(--card2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    font-size: 0.95rem;
+    padding: 10px 16px;
+  }
+  .category {
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+  .category-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .category-head input[type="text"] {
+    flex: 1;
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  .category-head input[type="color"] {
+    width: 40px;
+    height: 36px;
+    border: none;
+    border-radius: 8px;
+    background: none;
+    padding: 0;
+    cursor: pointer;
+  }
+  .item-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .item-row input[type="text"] {
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 0.9rem;
+  }
+  .item-row .label-input { width: 34%; }
+  .item-row .value-input { flex: 1; font-family: monospace; }
+  .actions-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+  .actions-row button { flex: 1; }
+  #seedBox, #importBox {
+    width: 100%;
+    background: var(--card2);
+    border: 1px solid var(--border);
+    color: var(--accent2);
+    border-radius: 8px;
+    padding: 12px;
+    font-family: monospace;
+    font-size: 0.95rem;
+    word-break: break-all;
+    min-height: 60px;
+    margin-top: 10px;
+  }
+  #importBox {
+    color: var(--text);
+    resize: vertical;
+  }
+  .copy-btn {
+    margin-top: 10px;
+    background: var(--accent);
+    color: #06283a;
+  }
+  .hint {
+    color: var(--muted);
+    font-size: 0.85rem;
+    margin-top: 8px;
+  }
+  #importMsg {
+    margin-top: 8px;
+    font-size: 0.85rem;
+  }
+  #importMsg.error { color: var(--danger); }
+  #importMsg.success { color: var(--accent2); }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🔐 Info Keeper Editor</h1>
+  <p class="subtitle">Add categories (with a color) and the passwords, codes, IDs or numbers inside each — then get a SEED code to paste into the watch app's settings.</p>
+
+  <div class="card">
+    <h2>0. Import an existing SEED (optional)</h2>
+    <textarea id="importBox" rows="2" placeholder="Paste a SEED code here to load it for editing"></textarea>
+    <div class="actions-row">
+      <button class="btn-secondary" onclick="importSeed()">Load SEED</button>
+    </div>
+    <p id="importMsg"></p>
+  </div>
+
+  <div class="card">
+    <h2>1. Categories</h2>
+    <div id="categoriesList"></div>
+    <div class="actions-row">
+      <button class="btn-add" onclick="addCategory()">+ Add category</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>2. SEED code</h2>
+    <p class="hint" style="color:#f59e0b">⚠ The watch does not support non-Latin scripts — use English or Latin transliteration.</p>
+    <button class="btn-primary" onclick="generateSeed()">Generate SEED</button>
+    <div id="seedBox">Click "Generate SEED" to produce the code</div>
+    <button class="copy-btn" onclick="copySeed()">Copy SEED</button>
+    <p class="hint">Paste this code into the app's settings in Garmin Connect IQ (Data Seed).</p>
+  </div>
+</div>
+
+<script>
+const DEFAULT_COLORS = ["#38bdf8", "#22c55e", "#f97316", "#ef4444", "#a855f7", "#eab308"];
+
+// categories = [{ name, color, items: [{label, value}] }]
+let categories = [
+  { name: "Passwords", color: "#38bdf8", items: [{ label: "WiFi home", value: "" }] },
+  { name: "IDs", color: "#22c55e", items: [{ label: "ID number", value: "" }] },
+];
+
+function render() {
+  const list = document.getElementById("categoriesList");
+  list.innerHTML = "";
+  categories.forEach((cat, ci) => {
+    const div = document.createElement("div");
+    div.className = "category";
+
+    const head = document.createElement("div");
+    head.className = "category-head";
+    head.innerHTML = `
+      <input type="color" value="${cat.color}" onchange="updateCategoryColor(${ci}, this.value)">
+      <input type="text" value="${cat.name.replace(/"/g,'&quot;')}" placeholder="Category name" onchange="updateCategoryName(${ci}, this.value)">
+      <button class="btn-remove" onclick="removeCategory(${ci})">✕</button>
+    `;
+    div.appendChild(head);
+
+    cat.items.forEach((item, ii) => {
+      const row = document.createElement("div");
+      row.className = "item-row";
+      row.innerHTML = `
+        <input class="label-input" type="text" value="${item.label.replace(/"/g,'&quot;')}" placeholder="Label" onchange="updateItem(${ci},${ii},'label',this.value)">
+        <input class="value-input" type="text" value="${item.value.replace(/"/g,'&quot;')}" placeholder="Value" onchange="updateItem(${ci},${ii},'value',this.value)">
+        <button class="btn-remove" onclick="removeItem(${ci},${ii})">✕</button>
+      `;
+      div.appendChild(row);
+    });
+
+    const addBtn = document.createElement("div");
+    addBtn.className = "actions-row";
+    addBtn.innerHTML = `<button class="btn-add" onclick="addItem(${ci})">+ Add item</button>`;
+    div.appendChild(addBtn);
+
+    list.appendChild(div);
+  });
+}
+
+function addCategory() {
+  const color = DEFAULT_COLORS[categories.length % DEFAULT_COLORS.length];
+  categories.push({ name: "New category", color, items: [] });
+  render();
+}
+function removeCategory(ci) {
+  categories.splice(ci, 1);
+  render();
+}
+function updateCategoryName(ci, val) {
+  categories[ci].name = val;
+}
+function updateCategoryColor(ci, val) {
+  categories[ci].color = val;
+}
+function addItem(ci) {
+  categories[ci].items.push({ label: "", value: "" });
+  render();
+}
+function removeItem(ci, ii) {
+  categories[ci].items.splice(ii, 1);
+  render();
+}
+function updateItem(ci, ii, field, val) {
+  categories[ci].items[ii][field] = val;
+}
+
+// Percent-encodes every character except the format's own unreserved set,
+// so free text can safely contain any of : , ; ~ | = without corrupting the seed.
+function encField(s) {
+  return encodeURIComponent(s).replace(/[~!*'()]/g, c => "%" + c.charCodeAt(0).toString(16).toUpperCase());
+}
+function decField(s) {
+  return decodeURIComponent(s);
+}
+function hexColor(c) {
+  return c.replace("#", "").toUpperCase();
+}
+
+// SEED format: 1|C=<hex6>:<encName>,...|I=<catIdx>:<encLabel>~<encValue>,...;<catIdx>:...
+function generateSeed() {
+  const box = document.getElementById("seedBox");
+  const nonAscii = [];
+  categories.forEach(cat => {
+    if (!/^[\x20-\x7E]*$/.test(cat.name)) { nonAscii.push(`Category name: "${cat.name}"`); }
+    cat.items.forEach(item => {
+      if (!/^[\x20-\x7E]*$/.test(item.label) || !/^[\x20-\x7E]*$/.test(item.value)) {
+        nonAscii.push(`${cat.name}: "${item.label}" / "${item.value}"`);
+      }
+    });
+  });
+  if (nonAscii.length) {
+    box.style.color = "var(--danger)";
+    box.textContent = "Error: the watch does not support non-English characters. Please fix:\n" + nonAscii.join("\n");
+    return;
+  }
+  if (categories.length === 0) {
+    box.style.color = "var(--danger)";
+    box.textContent = "Add at least one category first.";
+    return;
+  }
+  box.style.color = "";
+
+  const cStr = "C=" + categories.map(cat => `${hexColor(cat.color)}:${encField(cat.name)}`).join(",");
+
+  const iGroups = [];
+  categories.forEach((cat, ci) => {
+    if (cat.items.length === 0) { return; }
+    const pairs = cat.items
+      .filter(item => item.label.trim() !== "" || item.value.trim() !== "")
+      .map(item => `${encField(item.label)}~${encField(item.value)}`);
+    if (pairs.length) { iGroups.push(`${ci}:${pairs.join(",")}`); }
+  });
+  const iStr = "I=" + iGroups.join(";");
+
+  const seed = "1|" + [cStr, iStr].join("|");
+  box.textContent = seed;
+}
+
+function copySeed() {
+  const text = document.getElementById("seedBox").textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    alert("Copied!");
+  });
+}
+
+// Parses a SEED string (1|C=...|I=...) and loads it into the editor.
+function importSeed() {
+  const msg = document.getElementById("importMsg");
+  const raw = document.getElementById("importBox").value.trim();
+  if (!raw) {
+    msg.className = "error";
+    msg.textContent = "Paste a SEED code first.";
+    return;
+  }
+  if (!raw.startsWith("1|")) {
+    msg.className = "error";
+    msg.textContent = "Unrecognized SEED format.";
+    return;
+  }
+
+  try {
+    const sections = raw.slice(2).split("|");
+    let cStr = null, iStr = null;
+    sections.forEach(s => {
+      if (s.startsWith("C=")) cStr = s.slice(2);
+      else if (s.startsWith("I=")) iStr = s.slice(2);
+    });
+    if (cStr === null) { throw new Error("Missing C= section."); }
+
+    const newCategories = cStr.length ? cStr.split(",").map(part => {
+      const colon = part.indexOf(":");
+      if (colon === -1) { throw new Error(`Bad category: "${part}"`); }
+      return { color: "#" + part.slice(0, colon).toLowerCase(), name: decField(part.slice(colon + 1)), items: [] };
+    }) : [];
+    if (newCategories.length === 0) { throw new Error("No categories found."); }
+
+    if (iStr) {
+      iStr.split(";").filter(x => x.length).forEach(group => {
+        const colon = group.indexOf(":");
+        if (colon === -1) { throw new Error(`Bad item group: "${group}"`); }
+        const catIdx = parseInt(group.slice(0, colon), 10);
+        if (isNaN(catIdx) || !newCategories[catIdx]) { throw new Error(`Bad category index: "${group}"`); }
+        const rest = group.slice(colon + 1);
+        if (!rest.length) { return; }
+        rest.split(",").forEach(pair => {
+          const tilde = pair.indexOf("~");
+          if (tilde === -1) { throw new Error(`Bad item: "${pair}"`); }
+          newCategories[catIdx].items.push({ label: decField(pair.slice(0, tilde)), value: decField(pair.slice(tilde + 1)) });
+        });
+      });
+    }
+
+    categories = newCategories;
+    render();
+
+    msg.className = "success";
+    msg.textContent = "SEED loaded successfully.";
+  } catch (e) {
+    msg.className = "error";
+    msg.textContent = "Could not parse SEED: " + e.message;
+  }
+}
+
+render();
+</script>
+</body>
+</html>

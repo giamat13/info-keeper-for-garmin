@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "monkeyc",
+            "request": "launch",
+            "name": "Run info-keeper-for-garmin in Simulator",
+            "program": "${workspaceFolder}/bin/info-keeper-for-garmin.prg",
+            "manifest": "${workspaceFolder}/manifest.xml",
+            "jungleFiles": "${workspaceFolder}/monkey.jungle",
+            "device": "fenix847mm",
+            "developerKeyPath": "${workspaceFolder}/developer_key.der"
+        }
+    ]
+}

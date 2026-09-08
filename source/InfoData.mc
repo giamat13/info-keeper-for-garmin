@@ -1,0 +1,140 @@
+import Toybox.Lang;
+
+// One key/value entry inside a category (e.g. "WiFi password" / "hunter2").
+class InfoItem {
+    var label as String;
+    var value as String;
+
+    function initialize(l as String, v as String) {
+        label = l;
+        value = v;
+    }
+}
+
+// A colored group of items (e.g. "Passwords", colored blue).
+class InfoCategory {
+    var name as String;
+    var color as Number; // 0xRRGGBB
+    var items as Array<InfoItem>;
+
+    function initialize(n as String, c as Number, i as Array<InfoItem>) {
+        name = n;
+        color = c;
+        items = i;
+    }
+}
+
+// Parses the SEED string produced by the web editor into categories + items.
+//
+// Format: 1|C=<hex6>:<encName>,...|I=<catIdx>:<encLabel>~<encValue>,...;<catIdx>:...
+// Every free-text field (name/label/value) is percent-encoded so it can safely
+// contain any of the format's own delimiter characters (see web/index.html).
+class InfoSeed {
+
+    // Splits `s` on single-character delimiter `delim` (Monkey C's String has no split()).
+    static function splitStr(s as String, delim as String) as Array<String> {
+        var result = [] as Array<String>;
+        var start = 0;
+        var idx = s.find(delim);
+        while (idx != null) {
+            result.add(s.substring(start, idx) as String);
+            start = idx + delim.length();
+            idx = s.substring(start, s.length()).find(delim);
+            if (idx != null) { idx += start; }
+        }
+        result.add(s.substring(start, s.length()) as String);
+        return result;
+    }
+
+    static function fromBase16(s as String) as Number {
+        var digits = "0123456789ABCDEF";
+        var value = 0;
+        var upper = s.toUpper();
+        for (var i = 0; i < upper.length(); i++) {
+            var c = upper.substring(i, i + 1);
+            var d = digits.find(c);
+            if (d == null) { return 0; }
+            value = value * 16 + d;
+        }
+        return value;
+    }
+
+    // Decodes %XX percent-escapes back into their literal (Latin-1) characters.
+    static function percentDecode(s as String) as String {
+        var result = "";
+        var i = 0;
+        var len = s.length();
+        while (i < len) {
+            var c = s.substring(i, i + 1);
+            if (c.equals("%") && i + 3 <= len) {
+                var code = InfoSeed.fromBase16(s.substring(i + 1, i + 3) as String);
+                result += code.toChar().toString();
+                i += 3;
+            } else {
+                result += c;
+                i += 1;
+            }
+        }
+        return result;
+    }
+
+    // Returns null if the seed is missing, empty, or malformed.
+    static function parse(seed as String) as Array<InfoCategory>? {
+        if (seed.length() < 2 || !seed.substring(0, 2).equals("1|")) {
+            return null;
+        }
+        var body = seed.substring(2, seed.length());
+        var sections = InfoSeed.splitStr(body, "|");
+        var cStr = null;
+        var iStr = null;
+        for (var i = 0; i < sections.size(); i++) {
+            var s = sections[i] as String;
+            if (s.find("C=") == 0) { cStr = s.substring(2, s.length()); }
+            else if (s.find("I=") == 0) { iStr = s.substring(2, s.length()); }
+        }
+        if (cStr == null) {
+            return null;
+        }
+
+        var categories = [] as Array<InfoCategory>;
+        if ((cStr as String).length() > 0) {
+            var cParts = InfoSeed.splitStr(cStr as String, ",");
+            for (var i = 0; i < cParts.size(); i++) {
+                var part = cParts[i] as String;
+                var colon = part.find(":");
+                if (colon == null) { continue; }
+                var color = InfoSeed.fromBase16(part.substring(0, colon) as String);
+                var name = InfoSeed.percentDecode(part.substring(colon + 1, part.length()) as String);
+                categories.add(new InfoCategory(name, color, [] as Array<InfoItem>));
+            }
+        }
+        if (categories.size() == 0) {
+            return null;
+        }
+
+        if (iStr != null && (iStr as String).length() > 0) {
+            var groups = InfoSeed.splitStr(iStr as String, ";");
+            for (var g = 0; g < groups.size(); g++) {
+                var entry = groups[g] as String;
+                var colon = entry.find(":");
+                if (colon == null) { continue; }
+                var catIdx = (entry.substring(0, colon) as String).toNumber();
+                if (catIdx == null || catIdx < 0 || catIdx >= categories.size()) { continue; }
+                var rest = entry.substring(colon + 1, entry.length()) as String;
+                if (rest.length() == 0) { continue; }
+                var pairs = InfoSeed.splitStr(rest, ",");
+                for (var p = 0; p < pairs.size(); p++) {
+                    var pair = pairs[p] as String;
+                    var tilde = pair.find("~");
+                    if (tilde == null) { continue; }
+                    var label = InfoSeed.percentDecode(pair.substring(0, tilde) as String);
+                    var value = InfoSeed.percentDecode(pair.substring(tilde + 1, pair.length()) as String);
+                    categories[catIdx].items.add(new InfoItem(label, value));
+                }
+            }
+        }
+
+        return categories;
+    }
+
+}
