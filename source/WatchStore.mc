@@ -1,4 +1,5 @@
 import Toybox.Lang;
+import Toybox.Application;
 import Toybox.Application.Storage;
 
 // Persists categories/items created directly on the watch, kept separate
@@ -16,6 +17,42 @@ class WatchStore {
         }
         Storage.setValue("wsNextId", (n as Number) + 1);
         return n as Number;
+    }
+
+    // True once at least one category has been created directly on the
+    // watch - used by NoDataView to notice (from onShow, once it's actually
+    // visible again) that the very first category was just created.
+    static function hasWatchCategories() as Boolean {
+        var arr = Storage.getValue("wsCategories");
+        return arr != null && (arr as Array).size() > 0;
+    }
+
+    // Rebuilds the full category list exactly like the app does at launch
+    // (phone SEED merged with on-watch data) - shared by
+    // info_keeper_for_garminApp.getInitialView() and the DEBUGRESET keyboard
+    // shortcut (KeyboardDelegate) so both compute the same thing.
+    static function loadAll() as Array<InfoCategory> {
+        var seed = Application.Properties.getValue("dataSeed") as String?;
+        var seedCategories = [] as Array<InfoCategory>;
+        if (seed != null && !seed.equals("")) {
+            var parsed = InfoSeed.parse(seed);
+            if (parsed != null) {
+                seedCategories = parsed;
+            }
+        }
+        return loadMerged(seedCategories);
+    }
+
+    // Wipes every bit of on-watch state: watch-created categories/items,
+    // the id counter, and the PIN. Does not touch the phone-provided SEED
+    // (Application.Properties.dataSeed) - that's the phone's data, not the
+    // watch's. Triggered by typing "DEBUGRESET" into any (alphanumeric)
+    // keyboard - see KeyboardDelegate.
+    static function resetAll() as Void {
+        Storage.deleteValue("wsCategories");
+        Storage.deleteValue("wsSeedItems");
+        Storage.deleteValue("wsNextId");
+        PinManager.reset();
     }
 
     // Tags `seedCategories` with their SEED index, attaches any watch-added
@@ -61,39 +98,68 @@ class WatchStore {
         return item;
     }
 
+    // Categories with requiresPin leave `items` empty here - their items
+    // stay encrypted at rest until PinEntry.unlockItems() decrypts them
+    // (see CategoriesDelegate.onUnlockPinEntered).
     private static function categoryFromDict(d as Dictionary) as InfoCategory {
+        var requiresPin = d.hasKey("requiresPin") ? (d["requiresPin"] as Boolean) : false;
         var items = [] as Array<InfoItem>;
-        var itemDicts = d["items"] as Array;
-        for (var i = 0; i < itemDicts.size(); i++) {
-            items.add(itemFromDict(itemDicts[i] as Dictionary));
+        if (!requiresPin) {
+            var itemDicts = d["items"] as Array;
+            for (var i = 0; i < itemDicts.size(); i++) {
+                items.add(itemFromDict(itemDicts[i] as Dictionary));
+            }
         }
         var cat = new InfoCategory(d["name"] as String, d["color"] as Number, items);
         cat.fromWatch = true;
         cat.id = d["id"] as Number;
+        cat.requiresPin = requiresPin;
         return cat;
     }
 
-    static function addCategory(name as String, color as Number) as InfoCategory {
+    static function addCategory(name as String, color as Number, requiresPin as Boolean) as InfoCategory {
         var id = nextId();
         var list = Storage.getValue("wsCategories");
         var arr = (list == null) ? ([] as Array) : (list as Array);
-        arr.add({ "id" => id, "name" => name, "color" => color, "items" => [] as Array });
+        arr.add({ "id" => id, "name" => name, "color" => color, "items" => [] as Array, "requiresPin" => requiresPin });
         Storage.setValue("wsCategories", arr);
 
         var cat = new InfoCategory(name, color, [] as Array<InfoItem>);
         cat.fromWatch = true;
         cat.id = id;
+        cat.requiresPin = requiresPin;
         return cat;
+    }
+
+    // Combines label+value into one string (packItem) so a PIN-protected
+    // item only needs one IV/ciphertext blob instead of two.
+    private static function packItem(label as String, value as String) as String {
+        return label + "" + value;
+    }
+
+    private static function unpackItem(s as String) as Array<String> {
+        var sep = s.find("");
+        if (sep == null) {
+            return [ s, "" ] as Array<String>;
+        }
+        return [ s.substring(0, sep) as String, s.substring(sep + 1, s.length()) as String ] as Array<String>;
     }
 
     static function addItem(cat as InfoCategory, label as String, value as String) as InfoItem {
         var id = nextId();
-        var itemDict = { "id" => id, "label" => label, "value" => value };
 
         if (cat.fromWatch) {
             var arr = Storage.getValue("wsCategories") as Array;
             var catDict = findById(arr, cat.id as Number);
             if (catDict != null) {
+                var itemDict = {} as Dictionary;
+                itemDict["id"] = id;
+                if (cat.requiresPin) {
+                    itemDict["blob"] = Crypto.encrypt(packItem(label, value), cat.sessionKey as ByteArray);
+                } else {
+                    itemDict["label"] = label;
+                    itemDict["value"] = value;
+                }
                 (catDict["items"] as Array).add(itemDict);
                 Storage.setValue("wsCategories", arr);
             }
@@ -102,7 +168,7 @@ class WatchStore {
             var seedItems = (dict == null) ? ({} as Dictionary) : (dict as Dictionary);
             var idx = cat.seedIndex as Number;
             var list = seedItems.hasKey(idx) ? (seedItems[idx] as Array) : ([] as Array);
-            list.add(itemDict);
+            list.add({ "id" => id, "label" => label, "value" => value });
             seedItems[idx] = list;
             Storage.setValue("wsSeedItems", seedItems);
         }
@@ -156,8 +222,14 @@ class WatchStore {
             var list = catDict["items"] as Array;
             var itemDict = findById(list, item.id as Number);
             if (itemDict == null) { return; }
-            if (label != null) { itemDict["label"] = label; }
-            if (value != null) { itemDict["value"] = value; }
+            if (cat.requiresPin) {
+                var newLabel = (label != null) ? label : item.label;
+                var newValue = (value != null) ? value : item.value;
+                itemDict["blob"] = Crypto.encrypt(packItem(newLabel, newValue), cat.sessionKey as ByteArray);
+            } else {
+                if (label != null) { itemDict["label"] = label; }
+                if (value != null) { itemDict["value"] = value; }
+            }
             Storage.setValue("wsCategories", arr);
         } else {
             var seedItems = Storage.getValue("wsSeedItems") as Dictionary?;
@@ -171,6 +243,63 @@ class WatchStore {
             if (value != null) { itemDict["value"] = value; }
             Storage.setValue("wsSeedItems", seedItems);
         }
+    }
+
+    // Decrypts `cat`'s persisted items under `key` into cat.items, and
+    // keeps `key` on the category for the rest of this unlocked session so
+    // addItem/updateItem above stay encrypted going back to Storage.
+    static function unlockItems(cat as InfoCategory, key as ByteArray) as Void {
+        cat.sessionKey = key;
+        var arr = Storage.getValue("wsCategories") as Array;
+        var catDict = findById(arr, cat.id as Number);
+        if (catDict == null) { return; }
+        var itemDicts = catDict["items"] as Array;
+        var items = [] as Array<InfoItem>;
+        for (var i = 0; i < itemDicts.size(); i++) {
+            var d = itemDicts[i] as Dictionary;
+            var parts = unpackItem(Crypto.decrypt(d["blob"] as ByteArray, key));
+            var item = new InfoItem(parts[0] as String, parts[1] as String);
+            item.fromWatch = true;
+            item.id = d["id"] as Number;
+            items.add(item);
+        }
+        cat.items = items;
+    }
+
+    // Re-encrypts every item in `cat` from `oldKey` to `newKey`, operating
+    // on Storage directly since the category may not be unlocked in memory
+    // right now (used by PinManager.changePin).
+    static function reencryptCategory(cat as InfoCategory, oldKey as ByteArray, newKey as ByteArray) as Void {
+        var arr = Storage.getValue("wsCategories") as Array;
+        var catDict = findById(arr, cat.id as Number);
+        if (catDict == null) { return; }
+        var itemDicts = catDict["items"] as Array;
+        for (var i = 0; i < itemDicts.size(); i++) {
+            var d = itemDicts[i] as Dictionary;
+            var plain = Crypto.decrypt(d["blob"] as ByteArray, oldKey);
+            d["blob"] = Crypto.encrypt(plain, newKey);
+        }
+        Storage.setValue("wsCategories", arr);
+    }
+
+    // Decrypts every item in `cat` back to plaintext storage and clears its
+    // PIN requirement (used by PinManager.removePin).
+    static function decryptCategoryToPlain(cat as InfoCategory, key as ByteArray) as Void {
+        var arr = Storage.getValue("wsCategories") as Array;
+        var catDict = findById(arr, cat.id as Number);
+        if (catDict == null) { return; }
+        catDict["requiresPin"] = false;
+        var itemDicts = catDict["items"] as Array;
+        for (var i = 0; i < itemDicts.size(); i++) {
+            var d = itemDicts[i] as Dictionary;
+            var parts = unpackItem(Crypto.decrypt(d["blob"] as ByteArray, key));
+            d.remove("blob");
+            d["label"] = parts[0];
+            d["value"] = parts[1];
+        }
+        Storage.setValue("wsCategories", arr);
+        cat.requiresPin = false;
+        cat.sessionKey = null;
     }
 
     static function deleteItem(cat as InfoCategory, item as InfoItem) as Void {

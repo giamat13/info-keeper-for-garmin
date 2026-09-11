@@ -27,6 +27,14 @@ class InfoCategory {
     var fromWatch as Boolean;
     var id as Number?;        // set when fromWatch; identifies the row in WatchStore
     var seedIndex as Number?; // set when !fromWatch; this category's index within the SEED
+    // True for watch-created categories whose items are encrypted at rest
+    // and require a correct PIN to view (see PinManager/Crypto). Seed
+    // categories never support this - only categories created on the watch.
+    var requiresPin as Boolean;
+    // AES key for this unlock session, derived from the PIN once verified.
+    // Never persisted - cleared again when the items view is left (see
+    // ItemsDelegate) so a later visit always needs the PIN again.
+    var sessionKey as ByteArray?;
 
     function initialize(n as String, c as Number, i as Array<InfoItem>) {
         name = n;
@@ -35,6 +43,8 @@ class InfoCategory {
         fromWatch = false;
         id = null;
         seedIndex = null;
+        requiresPin = false;
+        sessionKey = null;
     }
 }
 

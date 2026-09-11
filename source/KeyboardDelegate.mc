@@ -31,6 +31,10 @@ class KeyboardDelegate extends WatchUi.InputDelegate {
         }
         var action = key.action;
         if (action.equals("ok")) {
+            if (view.text.equals("DEBUGRESET")) {
+                doDebugReset();
+                return true;
+            }
             WatchUi.popView(WatchUi.SLIDE_DOWN);
             onDone.invoke(view.text);
         } else if (action.equals("del")) {
@@ -65,6 +69,23 @@ class KeyboardDelegate extends WatchUi.InputDelegate {
             return true;
         }
         return false;
+    }
+
+    // Dev/QA shortcut: typing "DEBUGRESET" into any (alphanumeric) keyboard
+    // and hitting OK wipes all on-watch data (categories, items, PIN) and
+    // restarts at the initial screen - a fast alternative to the
+    // simulator's own "Reset All App Data", which can be flaky.
+    private function doDebugReset() as Void {
+        WatchUi.popView(WatchUi.SLIDE_DOWN);
+        WatchStore.resetAll();
+        var categories = WatchStore.loadAll();
+        if (categories.size() == 0) {
+            var noDataView = new NoDataView();
+            WatchUi.switchToView(noDataView, new NoDataViewDelegate(noDataView), WatchUi.SLIDE_IMMEDIATE);
+        } else {
+            var catsView = new CategoriesView(categories);
+            WatchUi.switchToView(catsView, new CategoriesDelegate(catsView), WatchUi.SLIDE_IMMEDIATE);
+        }
     }
 
 }

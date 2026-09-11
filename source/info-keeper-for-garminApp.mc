@@ -15,18 +15,9 @@ class info_keeper_for_garminApp extends Application.AppBase {
     }
 
     function getInitialView() as [Views] or [Views, InputDelegates] {
-        var seed = Application.Properties.getValue("dataSeed") as String?;
-        var seedCategories = [] as Array<InfoCategory>;
-        if (seed != null && !seed.equals("")) {
-            var parsed = InfoSeed.parse(seed);
-            if (parsed != null) {
-                seedCategories = parsed;
-            }
-        }
-
-        // Merge in whatever was created directly on the watch (categories
-        // and/or items), in addition to whatever the phone SEED provided.
-        var categories = WatchStore.loadMerged(seedCategories);
+        // Phone SEED merged with whatever was created directly on the watch
+        // (categories and/or items) - see WatchStore.loadAll().
+        var categories = WatchStore.loadAll();
         if (categories.size() == 0) {
             var noDataView = new NoDataView();
             return [ noDataView, new NoDataViewDelegate(noDataView) ];

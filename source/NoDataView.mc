@@ -20,7 +20,18 @@ class NoDataView extends WatchUi.View {
         createY = (dc.getHeight() * 0.94).toNumber();
     }
 
+    // Also fires when this view is revealed again after the "Require PIN?"
+    // question (pushed directly on top of this, the app's only view at
+    // first-time setup) is answered and popped - by which point the new
+    // category is already persisted (see CategoryCreateFlow / Confirm.show),
+    // so switching to CategoriesView here, rather than synchronously from
+    // the confirm callback, can't race that pop.
     function onShow() as Void {
+        if (WatchStore.hasWatchCategories()) {
+            var catsView = new CategoriesView(WatchStore.loadMerged([] as Array<InfoCategory>));
+            WatchUi.switchToView(catsView, new CategoriesDelegate(catsView), WatchUi.SLIDE_IMMEDIATE);
+            return;
+        }
         if (Communications has :openWebPage) {
             Communications.openWebPage(SETUP_URL, {}, null);
         }
@@ -86,9 +97,10 @@ class NoDataViewDelegate extends WatchUi.InputDelegate {
         return true;
     }
 
+    // No-op: the category is already persisted by the time this runs (see
+    // WatchStore.addCategory), and NoDataView.onShow() picks it up and
+    // switches to CategoriesView once this screen is visible again.
     function onFirstCategoryCreated(cat as InfoCategory) as Void {
-        var catsView = new CategoriesView([cat] as Array<InfoCategory>);
-        WatchUi.switchToView(catsView, new CategoriesDelegate(catsView), WatchUi.SLIDE_IMMEDIATE);
     }
 
 }

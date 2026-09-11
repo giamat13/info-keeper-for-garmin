@@ -50,7 +50,7 @@ class ItemsDelegate extends WatchUi.InputDelegate {
             WatchUi.requestUpdate();
             return true;
         } else if (dir == WatchUi.SWIPE_RIGHT) {
-            WatchUi.popView(WatchUi.SLIDE_RIGHT);
+            leaveView();
             return true;
         }
         return false;
@@ -67,10 +67,20 @@ class ItemsDelegate extends WatchUi.InputDelegate {
             WatchUi.requestUpdate();
             return true;
         } else if (key == WatchUi.KEY_ESC) {
-            WatchUi.popView(WatchUi.SLIDE_RIGHT);
+            leaveView();
             return true;
         }
         return false;
+    }
+
+    // Wipes the decrypted items and unlock key of a PIN-protected category
+    // when leaving it, so a later visit always needs the PIN again.
+    private function leaveView() as Void {
+        if (view.category.requiresPin) {
+            view.category.items = [] as Array<InfoItem>;
+            view.category.sessionKey = null;
+        }
+        WatchUi.popView(WatchUi.SLIDE_RIGHT);
     }
 
     // -- Bottom-left options menu: add item, plus edit/delete the category
@@ -137,7 +147,7 @@ class ItemsDelegate extends WatchUi.InputDelegate {
     }
 
     function confirmDeleteCategory() as Void {
-        WatchUi.pushView(new WatchUi.Confirmation("Delete category?"), new ConfirmDelegate(method(:onCategoryDeleteConfirmed)), WatchUi.SLIDE_IMMEDIATE);
+        Confirm.show("Delete category?", method(:onCategoryDeleteConfirmed), null);
     }
 
     function onCategoryDeleteConfirmed() as Void {
@@ -188,7 +198,7 @@ class ItemsDelegate extends WatchUi.InputDelegate {
     }
 
     function confirmDeleteItem() as Void {
-        WatchUi.pushView(new WatchUi.Confirmation("Delete item?"), new ConfirmDelegate(method(:onItemDeleteConfirmed)), WatchUi.SLIDE_IMMEDIATE);
+        Confirm.show("Delete item?", method(:onItemDeleteConfirmed), null);
     }
 
     function onItemDeleteConfirmed() as Void {

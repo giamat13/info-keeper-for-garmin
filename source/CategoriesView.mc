@@ -34,6 +34,9 @@ class CategoriesView extends WatchUi.View {
     private var plusX as Number = 0;
     private var plusY as Number = 0;
     private var plusR as Number = 18;
+    private var pinX as Number = 0;
+    private var pinY as Number = 0;
+    private var pinR as Number = 18;
     private var isRoundScreen as Boolean = false;
 
     function initialize(cats as Array<InfoCategory>) {
@@ -76,9 +79,13 @@ class CategoriesView extends WatchUi.View {
             var safeY = (height - side) / 2;
             plusX = (safeX + side * 0.86).toNumber();
             plusY = (safeY + side * 0.88).toNumber();
+            pinX = (safeX + side * 0.14).toNumber();
+            pinY = (safeY + side * 0.88).toNumber();
         } else {
             plusX = (width * 0.86).toNumber();
             plusY = (height * 0.88).toNumber();
+            pinX = (width * 0.14).toNumber();
+            pinY = (height * 0.88).toNumber();
         }
     }
 
@@ -87,6 +94,15 @@ class CategoriesView extends WatchUi.View {
         var dx = x - plusX;
         var dy = y - plusY;
         var r = plusR + 10; // a bit more forgiving than the drawn circle
+        return (dx * dx + dy * dy) <= (r * r);
+    }
+
+    // True if (x,y) hits the PIN settings button (bottom-left, same corner
+    // ItemsView uses for its options button).
+    function pinButtonContains(x as Number, y as Number) as Boolean {
+        var dx = x - pinX;
+        var dy = y - pinY;
+        var r = pinR + 10;
         return (dx * dx + dy * dy) <= (r * r);
     }
 
@@ -194,6 +210,11 @@ class CategoriesView extends WatchUi.View {
         dc.fillCircle(plusX, plusY, plusR);
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         dc.drawText(plusX, plusY, Graphics.FONT_MEDIUM, "+", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle(pinX, pinY, pinR);
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(pinX, pinY, Graphics.FONT_XTINY, "PIN", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
     function onHide() as Void {

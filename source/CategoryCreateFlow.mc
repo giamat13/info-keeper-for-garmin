@@ -1,13 +1,14 @@
 import Toybox.WatchUi;
 import Toybox.Lang;
 
-// Two-step create-category flow (name, then color), shared by CategoriesView
-// (adding to an existing list) and NoDataView (creating the very first
-// category with no SEED at all).
+// Three-step create-category flow (name, then color, then whether it
+// requires a PIN), shared by CategoriesView (adding to an existing list)
+// and NoDataView (creating the very first category with no SEED at all).
 class CategoryCreateFlow {
 
     var onCreated as Lang.Method;
     private var pendingName as String = "";
+    private var pendingColor as Number = 0;
 
     function initialize(cb as Lang.Method) {
         onCreated = cb;
@@ -27,7 +28,20 @@ class CategoryCreateFlow {
     }
 
     function onColorChosen(color as Number) as Void {
-        var cat = WatchStore.addCategory(pendingName, color);
+        pendingColor = color;
+        Confirm.show("Require PIN to view?", method(:onPinRequired), method(:onPinNotRequired));
+    }
+
+    function onPinRequired() as Void {
+        finish(true);
+    }
+
+    function onPinNotRequired() as Void {
+        finish(false);
+    }
+
+    private function finish(requiresPin as Boolean) as Void {
+        var cat = WatchStore.addCategory(pendingName, pendingColor, requiresPin);
         onCreated.invoke(cat);
     }
 
