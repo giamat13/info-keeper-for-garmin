@@ -89,7 +89,9 @@ class CategoriesDelegate extends WatchUi.InputDelegate {
     // -- PIN settings menu (set the first PIN, or change/remove it) --
 
     private function openPinMenu() as Void {
-        var menu = new WatchUi.Menu2({ :title => "PIN" });
+        var menu = new WatchUi.Menu2({ :title => "Options" });
+        menu.addItem(new WatchUi.MenuItem("Search", null, :search, null));
+        menu.addItem(new WatchUi.MenuItem("Export data", null, :export, null));
         if (PinManager.isSet()) {
             menu.addItem(new WatchUi.MenuItem("Change PIN", null, :change, null));
             menu.addItem(new WatchUi.MenuItem("Remove PIN", null, :remove, null));
@@ -97,11 +99,21 @@ class CategoriesDelegate extends WatchUi.InputDelegate {
             menu.addItem(new WatchUi.MenuItem("Set PIN", null, :set, null));
         }
         var actions = {
+            :search => method(:startSearch),
+            :export => method(:startExport),
             :set => method(:startSetPin),
             :change => method(:startChangePin),
             :remove => method(:startRemovePin),
         };
         WatchUi.pushView(menu, new ActionMenuDelegate(actions), WatchUi.SLIDE_UP);
+    }
+
+    function startSearch() as Void {
+        new SearchFlow(view).start();
+    }
+
+    function startExport() as Void {
+        new ExportFlow(view.categories).start();
     }
 
     function startSetPin() as Void {

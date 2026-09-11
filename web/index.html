@@ -389,6 +389,12 @@ function importSeed() {
 }
 
 render();
+
+const seedParam = new URLSearchParams(location.search).get("seed");
+if (seedParam) {
+  document.getElementById("importBox").value = seedParam;
+  importSeed();
+}
 </script>
 </body>
 </html>

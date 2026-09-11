@@ -83,6 +83,73 @@ class InfoSeed {
         return value;
     }
 
+    static function toBase16(n as Number) as String {
+        var digits = "0123456789ABCDEF";
+        var result = "";
+        for (var i = 0; i < 6; i++) {
+            result = digits.substring(n & 0xF, (n & 0xF) + 1) + result;
+            n = n >> 4;
+        }
+        return result;
+    }
+
+    // Percent-encodes every character outside [A-Za-z0-9-_.], the inverse of
+    // percentDecode - mirrors web/index.html's encField() exactly (same
+    // unreserved set as encodeURIComponent, minus ~ ! * ' ( ), which that JS
+    // helper escapes on top of the default) so both sides agree on the format.
+    static function percentEncode(s as String) as String {
+        var safe = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.";
+        var digits = "0123456789ABCDEF";
+        var result = "";
+        for (var i = 0; i < s.length(); i++) {
+            var c = s.substring(i, i + 1);
+            if (safe.find(c) != null) {
+                result += c;
+            } else {
+                var code = c.toCharArray()[0].toNumber();
+                var hi = (code >> 4) & 0xF;
+                var lo = code & 0xF;
+                result += "%" + digits.substring(hi, hi + 1) + digits.substring(lo, lo + 1);
+            }
+        }
+        return result;
+    }
+
+    // Serializes categories back into the SEED format parse() reads - the
+    // inverse of parse(), mirroring web/index.html's generateSeed().
+    static function serialize(categories as Array<InfoCategory>) as String {
+        var cParts = [] as Array<String>;
+        for (var i = 0; i < categories.size(); i++) {
+            var cat = categories[i];
+            cParts.add(InfoSeed.toBase16(cat.color) + ":" + InfoSeed.percentEncode(cat.name));
+        }
+        var cStr = "C=" + InfoSeed.joinStr(cParts, ",");
+
+        var iGroups = [] as Array<String>;
+        for (var i = 0; i < categories.size(); i++) {
+            var cat = categories[i];
+            if (cat.items.size() == 0) { continue; }
+            var pairs = [] as Array<String>;
+            for (var j = 0; j < cat.items.size(); j++) {
+                var item = cat.items[j];
+                pairs.add(InfoSeed.percentEncode(item.label) + "~" + InfoSeed.percentEncode(item.value));
+            }
+            iGroups.add(i.toString() + ":" + InfoSeed.joinStr(pairs, ","));
+        }
+        var iStr = "I=" + InfoSeed.joinStr(iGroups, ";");
+
+        return "1|" + cStr + "|" + iStr;
+    }
+
+    static function joinStr(parts as Array<String>, delim as String) as String {
+        var result = "";
+        for (var i = 0; i < parts.size(); i++) {
+            if (i > 0) { result += delim; }
+            result += parts[i];
+        }
+        return result;
+    }
+
     // Decodes %XX percent-escapes back into their literal (Latin-1) characters.
     static function percentDecode(s as String) as String {
         var result = "";
