@@ -1,6 +1,7 @@
 import Toybox.Graphics;
 import Toybox.WatchUi;
 import Toybox.Lang;
+import Toybox.System;
 
 // One tappable on-screen band; bounds are computed in onLayout so hit-testing
 // (in the delegate's onTap) never has to recompute screen geometry itself.
@@ -30,6 +31,10 @@ class CategoriesView extends WatchUi.View {
     private var bands as Array<CategoryBand> = [] as Array<CategoryBand>;
     private var screenW as Number = 0;
     private var screenH as Number = 0;
+    private var plusX as Number = 0;
+    private var plusY as Number = 0;
+    private var plusR as Number = 18;
+    private var isRoundScreen as Boolean = false;
 
     function initialize(cats as Array<InfoCategory>) {
         View.initialize();
@@ -37,6 +42,7 @@ class CategoriesView extends WatchUi.View {
     }
 
     function onLayout(dc as Dc) as Void {
+        isRoundScreen = System.getDeviceSettings().screenShape == System.SCREEN_SHAPE_ROUND;
         layoutForSize(dc.getWidth(), dc.getHeight());
     }
 
@@ -59,6 +65,46 @@ class CategoriesView extends WatchUi.View {
             band.h = (slot == 2) ? (height - band.y) : bandH;
             bands.add(band);
         }
+
+        // On round watches the raw bottom-right corner (0.86w, 0.88h) falls
+        // outside the circular face - inset the button toward the largest
+        // square guaranteed to stay inside the circle (same fix as
+        // KeyboardView.computeSafeArea()).
+        if (isRoundScreen) {
+            var side = (width < height ? width : height) * 0.72;
+            var safeX = (width - side) / 2;
+            var safeY = (height - side) / 2;
+            plusX = (safeX + side * 0.86).toNumber();
+            plusY = (safeY + side * 0.88).toNumber();
+        } else {
+            plusX = (width * 0.86).toNumber();
+            plusY = (height * 0.88).toNumber();
+        }
+    }
+
+    // True if (x,y) hits the "create category" button (bottom-right).
+    function plusButtonContains(x as Number, y as Number) as Boolean {
+        var dx = x - plusX;
+        var dy = y - plusY;
+        var r = plusR + 10; // a bit more forgiving than the drawn circle
+        return (dx * dx + dy * dy) <= (r * r);
+    }
+
+    // Appends a newly-created category (from CategoryCreateFlow) and jumps to it.
+    function addCategory(cat as InfoCategory) as Void {
+        categories.add(cat);
+        cursor = categories.size() - 1;
+        layoutForSize(screenW, screenH);
+        WatchUi.requestUpdate();
+    }
+
+    // Removes a watch-created category (after deletion) and re-lays-out.
+    function removeCategory(cat as InfoCategory) as Void {
+        categories.remove(cat);
+        if (cursor >= categories.size() && cursor > 0) {
+            cursor -= 1;
+        }
+        layoutForSize(screenW, screenH);
     }
 
     function onShow() as Void {
@@ -89,7 +135,7 @@ class CategoriesView extends WatchUi.View {
         cursor = idx;
         var cat = categories[idx];
         var view = new ItemsView(cat);
-        WatchUi.pushView(view, new ItemsDelegate(view), WatchUi.SLIDE_LEFT);
+        WatchUi.pushView(view, new ItemsDelegate(view, self), WatchUi.SLIDE_LEFT);
     }
 
     // Best-guess text color for readable contrast against `bg` (0xRRGGBB).
@@ -131,6 +177,11 @@ class CategoriesView extends WatchUi.View {
             }
         }
 
+        if (categories.size() == 0) {
+            dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(w / 2, dc.getHeight() / 2, Graphics.FONT_SMALL, "No categories yet", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        }
+
         var numPages = (categories.size() + 2) / 3;
         if (numPages > 1) {
             dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
@@ -138,6 +189,11 @@ class CategoriesView extends WatchUi.View {
             var label = (page + 1).toString() + "/" + numPages.toString();
             dc.drawText(w / 2, 2, Graphics.FONT_XTINY, label, Graphics.TEXT_JUSTIFY_CENTER);
         }
+
+        dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
+        dc.fillCircle(plusX, plusY, plusR);
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(plusX, plusY, Graphics.FONT_MEDIUM, "+", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
     function onHide() as Void {

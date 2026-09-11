@@ -32,12 +32,20 @@ class CategoriesDelegate extends WatchUi.InputDelegate {
     }
 
     private function handleTapAt(x as Number, y as Number) as Boolean {
+        if (view.plusButtonContains(x, y)) {
+            new CategoryCreateFlow(method(:onCategoryCreated)).start();
+            return true;
+        }
         var idx = view.categoryAt(x, y);
         if (idx == null) {
             return false;
         }
         view.enter(idx as Number);
         return true;
+    }
+
+    function onCategoryCreated(cat as InfoCategory) as Void {
+        view.addCategory(cat);
     }
 
     function onKey(keyEvent as WatchUi.KeyEvent) as Boolean {

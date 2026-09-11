@@ -4,10 +4,16 @@ import Toybox.Lang;
 class InfoItem {
     var label as String;
     var value as String;
+    // True for items created on the watch (editable/deletable there); false
+    // for items that came from the phone SEED (read-only on the watch).
+    var fromWatch as Boolean;
+    var id as Number?; // set when fromWatch; identifies the row in WatchStore
 
     function initialize(l as String, v as String) {
         label = l;
         value = v;
+        fromWatch = false;
+        id = null;
     }
 }
 
@@ -16,11 +22,19 @@ class InfoCategory {
     var name as String;
     var color as Number; // 0xRRGGBB
     var items as Array<InfoItem>;
+    // True for categories created on the watch (editable/deletable there);
+    // false for categories that came from the phone SEED.
+    var fromWatch as Boolean;
+    var id as Number?;        // set when fromWatch; identifies the row in WatchStore
+    var seedIndex as Number?; // set when !fromWatch; this category's index within the SEED
 
     function initialize(n as String, c as Number, i as Array<InfoItem>) {
         name = n;
         color = c;
         items = i;
+        fromWatch = false;
+        id = null;
+        seedIndex = null;
     }
 }
 
