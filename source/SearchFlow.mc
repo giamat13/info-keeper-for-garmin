@@ -6,9 +6,13 @@ import Toybox.Lang;
 class SearchResult {
     var catIdx as Number;
     var itemIdx as Number?;
-    function initialize(c as Number, i as Number?) {
+    // Index of the query match within the category name (itemIdx null) or
+    // within the item's label (itemIdx set) - lets the menu highlight it.
+    var matchStart as Number;
+    function initialize(c as Number, i as Number?, m as Number) {
         catIdx = c;
         itemIdx = i;
+        matchStart = m;
     }
 }
 
@@ -69,12 +73,14 @@ class SearchFlow {
         results = [] as Array<SearchResult>;
         for (var ci = 0; ci < categories.size(); ci++) {
             var cat = categories[ci];
-            if (cat.name.toLower().find(q) != null) {
-                results.add(new SearchResult(ci, null));
+            var namePos = cat.name.toLower().find(q);
+            if (namePos != null) {
+                results.add(new SearchResult(ci, null, namePos as Number));
             }
             for (var ii = 0; ii < cat.items.size(); ii++) {
-                if (cat.items[ii].label.toLower().find(q) != null) {
-                    results.add(new SearchResult(ci, ii));
+                var labelPos = cat.items[ii].label.toLower().find(q);
+                if (labelPos != null) {
+                    results.add(new SearchResult(ci, ii, labelPos as Number));
                 }
             }
         }
@@ -84,12 +90,18 @@ class SearchFlow {
             return;
         }
 
+        var qLen = query.length();
         var menu = new WatchUi.Menu2({ :title => "Results" });
         for (var i = 0; i < results.size(); i++) {
             var r = results[i];
             var cat = categories[r.catIdx];
-            var label = (r.itemIdx == null) ? cat.name : (cat.name + " › " + cat.items[r.itemIdx as Number].label);
-            menu.addItem(new WatchUi.MenuItem(label, null, i, null));
+            if (r.itemIdx == null) {
+                menu.addItem(new HighlightMenuItem(i, cat.name, r.matchStart, qLen));
+            } else {
+                var prefix = cat.name + " › ";
+                var label = prefix + cat.items[r.itemIdx as Number].label;
+                menu.addItem(new HighlightMenuItem(i, label, prefix.length() + r.matchStart, qLen));
+            }
         }
         WatchUi.pushView(menu, new SearchResultsDelegate(method(:onResultSelected)), WatchUi.SLIDE_UP);
     }

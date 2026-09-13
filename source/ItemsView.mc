@@ -86,7 +86,8 @@ class ItemsView extends WatchUi.View {
         var maxWidth = (w * 0.82).toNumber();
 
         dc.setColor(category.color, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, h * 0.1, Graphics.FONT_SMALL, category.name, Graphics.TEXT_JUSTIFY_CENTER);
+        var title = category.favorite ? ("★ " + category.name) : category.name;
+        dc.drawText(cx, h * 0.1, Graphics.FONT_SMALL, title, Graphics.TEXT_JUSTIFY_CENTER);
 
         if (category.items.size() == 0) {
             dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);

@@ -89,14 +89,23 @@ class ItemsDelegate extends WatchUi.InputDelegate {
     private function openBottomMenu() as Void {
         var menu = new WatchUi.Menu2({ :title => "Options" });
         menu.addItem(new WatchUi.MenuItem("Add item", null, :addItem, null));
+        var favLabel = view.category.favorite ? "Remove from Favorites" : "Add to Favorites";
+        menu.addItem(new WatchUi.MenuItem(favLabel, null, :toggleFav, null));
         if (view.category.fromWatch) {
             menu.addItem(new WatchUi.MenuItem("Edit category", null, :editCategory, null));
         }
         var actions = {
             :addItem => method(:startAddItem),
+            :toggleFav => method(:toggleFavorite),
             :editCategory => method(:openCategoryEditMenu),
         };
         WatchUi.pushView(menu, new ActionMenuDelegate(actions), WatchUi.SLIDE_UP);
+    }
+
+    function toggleFavorite() as Void {
+        WatchStore.toggleFavorite(view.category);
+        categoriesView.resortFavorites();
+        WatchUi.requestUpdate();
     }
 
     function startAddItem() as Void {

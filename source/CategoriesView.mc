@@ -123,6 +123,23 @@ class CategoriesView extends WatchUi.View {
         layoutForSize(screenW, screenH);
     }
 
+    // Re-partitions favorites to the top after a favorite was toggled
+    // (from within ItemsDelegate), keeping the cursor on the same category.
+    function resortFavorites() as Void {
+        var selected = categories.size() > 0 ? categories[cursor] : null;
+        categories = WatchStore.sortFavoritesFirst(categories);
+        if (selected != null) {
+            for (var i = 0; i < categories.size(); i++) {
+                if (categories[i] == selected) {
+                    cursor = i;
+                    break;
+                }
+            }
+        }
+        layoutForSize(screenW, screenH);
+        WatchUi.requestUpdate();
+    }
+
     function onShow() as Void {
     }
 
@@ -190,6 +207,10 @@ class CategoriesView extends WatchUi.View {
 
             if (isSelected) {
                 dc.drawText(band.x + 14, band.y + band.h / 2, font, ">", Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+            }
+
+            if (cat.favorite) {
+                dc.drawText(band.x + band.w - 10, band.y + 8, Graphics.FONT_TINY, "★", Graphics.TEXT_JUSTIFY_RIGHT);
             }
         }
 

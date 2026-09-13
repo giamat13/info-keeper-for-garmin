@@ -52,6 +52,7 @@ class WatchStore {
         Storage.deleteValue("wsCategories");
         Storage.deleteValue("wsSeedItems");
         Storage.deleteValue("wsNextId");
+        Storage.deleteValue("wsFavCategories");
         PinManager.reset();
     }
 
@@ -88,7 +89,61 @@ class WatchStore {
             }
         }
 
+        for (var i = 0; i < result.size(); i++) {
+            result[i].favorite = isFavorite(result[i]);
+        }
+
+        return sortFavoritesFirst(result);
+    }
+
+    // Stable partition: favorites first, everyone else after, each group
+    // keeping its original relative order. Shared by loadMerged() (initial
+    // load) and CategoriesView.resortFavorites() (after a toggle).
+    static function sortFavoritesFirst(cats as Array<InfoCategory>) as Array<InfoCategory> {
+        var favs = [] as Array<InfoCategory>;
+        var rest = [] as Array<InfoCategory>;
+        for (var i = 0; i < cats.size(); i++) {
+            if (cats[i].favorite) { favs.add(cats[i]); } else { rest.add(cats[i]); }
+        }
+        var result = [] as Array<InfoCategory>;
+        result.addAll(favs);
+        result.addAll(rest);
         return result;
+    }
+
+    // Identifies `cat` for the favorites set: fromWatch categories by their
+    // stable id, seed categories by their index within the SEED (seed
+    // categories have no id of their own).
+    private static function favKeyFor(cat as InfoCategory) as String {
+        return cat.fromWatch ? ("w" + (cat.id as Number).toString()) : ("s" + (cat.seedIndex as Number).toString());
+    }
+
+    private static function favContains(favs as Array, key as String) as Boolean {
+        for (var i = 0; i < favs.size(); i++) {
+            if ((favs[i] as String).equals(key)) { return true; }
+        }
+        return false;
+    }
+
+    static function isFavorite(cat as InfoCategory) as Boolean {
+        var favs = Storage.getValue("wsFavCategories");
+        return favs != null && favContains(favs as Array, favKeyFor(cat));
+    }
+
+    static function toggleFavorite(cat as InfoCategory) as Void {
+        var favs = Storage.getValue("wsFavCategories");
+        var arr = (favs == null) ? ([] as Array) : (favs as Array);
+        var key = favKeyFor(cat);
+        if (favContains(arr, key)) {
+            for (var i = 0; i < arr.size(); i++) {
+                if ((arr[i] as String).equals(key)) { arr.remove(arr[i]); break; }
+            }
+            cat.favorite = false;
+        } else {
+            arr.add(key);
+            cat.favorite = true;
+        }
+        Storage.setValue("wsFavCategories", arr);
     }
 
     private static function itemFromDict(d as Dictionary) as InfoItem {

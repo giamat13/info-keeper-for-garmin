@@ -35,6 +35,11 @@ class InfoCategory {
     // Never persisted - cleared again when the items view is left (see
     // ItemsDelegate) so a later visit always needs the PIN again.
     var sessionKey as ByteArray?;
+    // Pinned to the top of CategoriesView. Persisted in WatchStore's
+    // "wsFavCategories" set (keyed by fromWatch id or seed index) rather than
+    // on the category itself, since seed categories can't be written back
+    // into the phone-provided SEED - see WatchStore.isFavorite/toggleFavorite.
+    var favorite as Boolean;
 
     function initialize(n as String, c as Number, i as Array<InfoItem>) {
         name = n;
@@ -45,6 +50,7 @@ class InfoCategory {
         seedIndex = null;
         requiresPin = false;
         sessionKey = null;
+        favorite = false;
     }
 }
 
