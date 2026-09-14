@@ -97,14 +97,20 @@ class ItemsView extends WatchUi.View {
         }
 
         var item = category.items[cursor];
+        var hasLabel = !item.label.equals("");
 
-        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, h * 0.32, Graphics.FONT_TINY, item.label, Graphics.TEXT_JUSTIFY_CENTER);
+        if (hasLabel) {
+            dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, h * 0.32, Graphics.FONT_TINY, item.label, Graphics.TEXT_JUSTIFY_CENTER);
+        }
 
         var lines = wrapText(dc, item.value, Graphics.FONT_MEDIUM, maxWidth);
         var lineHeight = dc.getFontHeight(Graphics.FONT_MEDIUM);
         var totalHeight = lines.size() * lineHeight;
-        var y = (h * 0.55) - (totalHeight / 2);
+        // With no label line above, center the value in the same vertical
+        // band the label+value pair would otherwise occupy.
+        var valueCenter = hasLabel ? h * 0.55 : h * 0.46;
+        var y = valueCenter - (totalHeight / 2);
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         for (var i = 0; i < lines.size(); i++) {
             dc.drawText(cx, y, Graphics.FONT_MEDIUM, lines[i], Graphics.TEXT_JUSTIFY_CENTER);

@@ -19,15 +19,18 @@ class ItemCreateFlow {
         Keyboard.show("", method(:onLabelEntered));
     }
 
+    // Label may be left blank (e.g. a category that's really just a bag of
+    // values) - only a totally empty item (blank label AND blank value) is
+    // rejected, in onValueEntered.
     function onLabelEntered(text as String) as Void {
-        if (text.equals("")) {
-            return;
-        }
         pendingLabel = text;
         Keyboard.show("", method(:onValueEntered));
     }
 
     function onValueEntered(text as String) as Void {
+        if (pendingLabel.equals("") && text.equals("")) {
+            return;
+        }
         var item = WatchStore.addItem(category, pendingLabel, text);
         onCreated.invoke(item);
     }

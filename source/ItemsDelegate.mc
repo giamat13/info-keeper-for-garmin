@@ -169,7 +169,8 @@ class ItemsDelegate extends WatchUi.InputDelegate {
 
     private function openItemMenu() as Void {
         var item = view.category.items[view.cursor];
-        var menu = new WatchUi.Menu2({ :title => item.label });
+        var title = item.label.equals("") ? item.value : item.label;
+        var menu = new WatchUi.Menu2({ :title => title });
         menu.addItem(new WatchUi.MenuItem("Edit label", null, :editLabel, null));
         menu.addItem(new WatchUi.MenuItem("Edit value", null, :editValue, null));
         menu.addItem(new WatchUi.MenuItem("Delete", null, :del, null));
@@ -186,9 +187,6 @@ class ItemsDelegate extends WatchUi.InputDelegate {
     }
 
     function onItemLabelEdited(text as String) as Void {
-        if (text.equals("")) {
-            return;
-        }
         var item = view.category.items[view.cursor];
         WatchStore.updateItem(view.category, item, text, null);
         item.label = text;

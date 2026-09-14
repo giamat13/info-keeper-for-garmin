@@ -40,6 +40,14 @@ class InfoCategory {
     // on the category itself, since seed categories can't be written back
     // into the phone-provided SEED - see WatchStore.isFavorite/toggleFavorite.
     var favorite as Boolean;
+    // True for a category that holds a school/weekly timetable (ported from
+    // the standalone School-timetable app) instead of plain label/value
+    // items. When true, `timetableSeed` holds that sub-feature's own SEED
+    // string (see Timetable.parseSchedule) and `items` is always empty -
+    // CategoriesView.enter() routes to TimetableItemsView instead of
+    // ItemsView for these.
+    var isTimetable as Boolean;
+    var timetableSeed as String?;
 
     function initialize(n as String, c as Number, i as Array<InfoItem>) {
         name = n;
@@ -51,6 +59,8 @@ class InfoCategory {
         requiresPin = false;
         sessionKey = null;
         favorite = false;
+        isTimetable = false;
+        timetableSeed = null;
     }
 }
 
@@ -59,6 +69,11 @@ class InfoCategory {
 // Format: 1|C=<hex6>:<encName>,...|I=<catIdx>:<encLabel>~<encValue>,...;<catIdx>:...
 // Every free-text field (name/label/value) is percent-encoded so it can safely
 // contain any of the format's own delimiter characters (see web/index.html).
+//
+// A category can instead be a timetable category: <hex6>:<encName>^<encTTSeed>,
+// where <encTTSeed> is a whole percent-encoded Timetable seed (Timetable.mc's
+// own "2|"/"3|"-prefixed format, ported from the standalone School-timetable
+// app). Such categories never appear in the I= section - see CategoriesView.enter().
 class InfoSeed {
 
     // Splits `s` on single-character delimiter `delim` (Monkey C's String has no split()).
@@ -127,14 +142,18 @@ class InfoSeed {
         var cParts = [] as Array<String>;
         for (var i = 0; i < categories.size(); i++) {
             var cat = categories[i];
-            cParts.add(InfoSeed.toBase16(cat.color) + ":" + InfoSeed.percentEncode(cat.name));
+            var cPart = InfoSeed.toBase16(cat.color) + ":" + InfoSeed.percentEncode(cat.name);
+            if (cat.isTimetable && cat.timetableSeed != null) {
+                cPart += "^" + InfoSeed.percentEncode(cat.timetableSeed as String);
+            }
+            cParts.add(cPart);
         }
         var cStr = "C=" + InfoSeed.joinStr(cParts, ",");
 
         var iGroups = [] as Array<String>;
         for (var i = 0; i < categories.size(); i++) {
             var cat = categories[i];
-            if (cat.items.size() == 0) { continue; }
+            if (cat.isTimetable || cat.items.size() == 0) { continue; }
             var pairs = [] as Array<String>;
             for (var j = 0; j < cat.items.size(); j++) {
                 var item = cat.items[j];
@@ -201,8 +220,20 @@ class InfoSeed {
                 var colon = part.find(":");
                 if (colon == null) { continue; }
                 var color = InfoSeed.fromBase16(part.substring(0, colon) as String);
-                var name = InfoSeed.percentDecode(part.substring(colon + 1, part.length()) as String);
-                categories.add(new InfoCategory(name, color, [] as Array<InfoItem>));
+                var rest = part.substring(colon + 1, part.length()) as String;
+                var caret = rest.find("^");
+                var name = "";
+                var cat = null;
+                if (caret == null) {
+                    name = InfoSeed.percentDecode(rest);
+                    cat = new InfoCategory(name, color, [] as Array<InfoItem>);
+                } else {
+                    name = InfoSeed.percentDecode(rest.substring(0, caret) as String);
+                    cat = new InfoCategory(name, color, [] as Array<InfoItem>);
+                    cat.isTimetable = true;
+                    cat.timetableSeed = InfoSeed.percentDecode(rest.substring(caret + 1, rest.length()) as String);
+                }
+                categories.add(cat as InfoCategory);
             }
         }
         if (categories.size() == 0) {

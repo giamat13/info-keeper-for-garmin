@@ -37,7 +37,7 @@
     font-size: 0.95rem;
   }
   .container {
-    max-width: 800px;
+    max-width: 900px;
     margin: 0 auto;
   }
   .card {
@@ -125,6 +125,114 @@
   }
   .item-row .label-input { width: 34%; }
   .item-row .value-input { flex: 1; font-family: monospace; }
+  .sub-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .sub-card h3 {
+    margin: 0 0 10px;
+    font-size: 0.95rem;
+    color: var(--accent);
+  }
+  .days-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .day-toggle {
+    padding: 8px 14px;
+    border-radius: 10px;
+    background: var(--card2);
+    border: 2px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    font-weight: 600;
+    font-size: 0.85rem;
+    transition: all .15s;
+  }
+  .day-toggle.active {
+    border-color: var(--accent2);
+    background: rgba(34,197,94,0.15);
+    color: var(--accent2);
+  }
+  .periods-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .period-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .period-row input[type="time"] {
+    background: var(--card2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 6px 8px;
+    font-size: 0.9rem;
+  }
+  .period-row span { color: var(--muted); }
+  .period-row .idx {
+    width: 22px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+  .period-row label.break-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--muted);
+    font-size: 0.85rem;
+    cursor: pointer;
+    margin-inline-start: 6px;
+  }
+  tr.break-row td.hourcell { color: #f59e0b; }
+  tr.break-row td.breakcell {
+    color: #f59e0b;
+    font-weight: 600;
+    text-align: center;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    overflow-x: auto;
+    display: block;
+  }
+  thead th {
+    background: var(--card2);
+    padding: 6px 6px;
+    font-size: 0.8rem;
+    color: var(--accent);
+    position: sticky;
+    top: 0;
+  }
+  tbody td {
+    padding: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  tbody td.hourcell {
+    color: var(--muted);
+    font-size: 0.75rem;
+    white-space: nowrap;
+    text-align: center;
+  }
+  td input[type="text"] {
+    width: 100%;
+    min-width: 80px;
+    background: var(--card2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 0.85rem;
+  }
+  .table-wrap { overflow-x: auto; }
   .actions-row {
     display: flex;
     gap: 10px;
@@ -170,7 +278,7 @@
 <body>
 <div class="container">
   <h1>🔐 Info Keeper Editor</h1>
-  <p class="subtitle">Add categories (with a color) and the passwords, codes, IDs or numbers inside each — then get a SEED code to paste into the watch app's settings.</p>
+  <p class="subtitle">Add categories (with a color) and the passwords, codes, IDs or numbers inside each - or a whole weekly timetable - then get a SEED code to paste into the watch app's settings.</p>
 
   <div class="card">
     <h2>0. Import an existing SEED (optional)</h2>
@@ -186,6 +294,7 @@
     <div id="categoriesList"></div>
     <div class="actions-row">
       <button class="btn-add" onclick="addCategory()">+ Add category</button>
+      <button class="btn-add" onclick="addTimetableCategory()">+ Add timetable category</button>
     </div>
   </div>
 
@@ -201,12 +310,402 @@
 
 <script>
 const DEFAULT_COLORS = ["#38bdf8", "#22c55e", "#f97316", "#ef4444", "#a855f7", "#eab308"];
+const DAY_NAMES = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const DAY_CODES = [0,1,2,3,4,5,6];
 
-// categories = [{ name, color, items: [{label, value}] }]
+// categories = [{ name, color, type: "info", items: [{label, value}] }
+//              |{ name, color, type: "timetable", tt: {...} }]
 let categories = [
-  { name: "Passwords", color: "#38bdf8", items: [{ label: "WiFi home", value: "" }] },
-  { name: "IDs", color: "#22c55e", items: [{ label: "ID number", value: "" }] },
+  { name: "Passwords", color: "#38bdf8", type: "info", items: [{ label: "WiFi home", value: "" }] },
+  { name: "IDs", color: "#22c55e", type: "info", items: [{ label: "ID number", value: "" }] },
 ];
+
+// -- Timetable category state (ported from the standalone School-timetable
+// -- app's editor). Each timetable category keeps its own `tt` state shaped
+// -- like that app's former module-level globals: { multiWeek, activeDays,
+// -- periods, lessons, weekConfigs, currentWeekIdx }.
+
+function defaultTT() {
+  return {
+    multiWeek: false,
+    activeDays: [0,1,2,3,4], // Sun-Thu default (Israeli school week)
+    periods: [
+      ["08:00","08:45", false],
+      ["08:45","09:30", false],
+      ["09:30","09:45", true],
+      ["09:45","10:30", false],
+      ["10:30","11:15", false],
+      ["11:15","11:30", true],
+      ["11:30","12:15", false],
+      ["12:15","13:00", false],
+    ],
+    lessons: {},
+    weekConfigs: [],
+    currentWeekIdx: 0,
+  };
+}
+
+// Absolute "week of year" key: year*100 + weekOfYear, weekOfYear = ceil(dayOfYear/7).
+// Must match Timetable.currentWeekKey() on the watch exactly.
+function computeWeekKey(date) {
+  const year = date.getFullYear();
+  const start = new Date(year, 0, 1);
+  const dayOfYear = Math.floor((date - start) / 86400000) + 1;
+  const week = Math.ceil(dayOfYear / 7);
+  return year * 100 + week;
+}
+function formatDateShort(d) {
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function initLessonsTT(ci) {
+  const tt = categories[ci].tt;
+  DAY_CODES.forEach(d => {
+    if (!tt.lessons[d]) tt.lessons[d] = [];
+    while (tt.lessons[d].length < tt.periods.length) tt.lessons[d].push("");
+    tt.lessons[d].length = tt.periods.length;
+  });
+}
+
+function toggleDayTT(ci, d) {
+  const tt = categories[ci].tt;
+  if (tt.activeDays.includes(d)) { tt.activeDays = tt.activeDays.filter(x => x !== d); }
+  else { tt.activeDays.push(d); tt.activeDays.sort((a,b) => a - b); }
+  render();
+}
+
+function addMinutes(hhmm, minutes) {
+  const [h, m] = hhmm.split(":").map(Number);
+  const total = (h * 60 + m + minutes + 1440) % 1440;
+  const hh = String(Math.floor(total / 60)).padStart(2, "0");
+  const mm = String(total % 60).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
+function updatePeriodTT(ci, i, idx, val) {
+  categories[ci].tt.periods[i][idx] = val;
+  render();
+}
+function toggleBreakTT(ci, i, checked) {
+  categories[ci].tt.periods[i][2] = checked;
+  render();
+}
+function addPeriodTT(ci) {
+  const tt = categories[ci].tt;
+  const last = tt.periods[tt.periods.length - 1];
+  const start = last ? last[1] : "08:00";
+  tt.periods.push([start, addMinutes(start, 45), false]);
+  render();
+}
+function removePeriodTT(ci, i) {
+  const tt = categories[ci].tt;
+  tt.periods.splice(i, 1);
+  DAY_CODES.forEach(d => tt.lessons[d] && tt.lessons[d].splice(i, 1));
+  render();
+}
+
+// Strips characters that collide with the seed format's own delimiters.
+function sanitizeSubject(val) {
+  return val.replace(/[,|;:^]/g, "");
+}
+function updateLessonTT(ci, day, periodIdx, val) {
+  const tt = categories[ci].tt;
+  if (!tt.lessons[day]) { tt.lessons[day] = []; }
+  tt.lessons[day][periodIdx] = sanitizeSubject(val);
+  render();
+}
+
+function snapshotCurrentTT(ci) {
+  const tt = categories[ci].tt;
+  if (!tt.multiWeek || tt.weekConfigs.length === 0) { return; }
+  tt.weekConfigs[tt.currentWeekIdx] = {
+    activeDays: tt.activeDays.slice(),
+    periods: tt.periods.map(p => p.slice()),
+    lessons: JSON.parse(JSON.stringify(tt.lessons)),
+    key: tt.weekConfigs[tt.currentWeekIdx].key,
+    label: tt.weekConfigs[tt.currentWeekIdx].label,
+  };
+}
+function loadWeekTT(ci, idx) {
+  const tt = categories[ci].tt;
+  tt.currentWeekIdx = idx;
+  const w = tt.weekConfigs[idx];
+  tt.activeDays = w.activeDays.slice();
+  tt.periods = w.periods.map(p => p.slice());
+  tt.lessons = JSON.parse(JSON.stringify(w.lessons));
+  initLessonsTT(ci);
+  render();
+}
+function weekTabClickTT(ci, idx) {
+  snapshotCurrentTT(ci);
+  loadWeekTT(ci, idx);
+}
+function setModeTT(ci, multi) {
+  snapshotCurrentTT(ci);
+  const tt = categories[ci].tt;
+  tt.multiWeek = multi;
+  if (multi && tt.weekConfigs.length === 0) {
+    applyWeeksAheadTT(ci, 2);
+    return; // applyWeeksAheadTT already renders
+  }
+  render();
+}
+// Rebuilds weekConfigs for "this week + N-1 more", reusing any config that
+// already exists for a given week key so edits aren't lost.
+function applyWeeksAheadTT(ci, explicitN) {
+  snapshotCurrentTT(ci);
+  const tt = categories[ci].tt;
+  const inputEl = document.getElementById(`weeksAheadInput-${ci}`);
+  const n = Math.max(1, Math.min(8, explicitN || parseInt(inputEl && inputEl.value, 10) || 2));
+  const today = new Date();
+  const newConfigs = [];
+  for (let i = 0; i < n; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() + i * 7);
+    const key = computeWeekKey(d);
+    const end = new Date(d);
+    end.setDate(end.getDate() + 6);
+    const existing = tt.weekConfigs.find(w => w.key === key);
+    newConfigs.push(existing || {
+      activeDays: tt.activeDays.slice(),
+      periods: tt.periods.map(p => p.slice()),
+      lessons: {},
+      key,
+      label: `Week ${key % 100} (${formatDateShort(d)}–${formatDateShort(end)})`
+    });
+  }
+  tt.weekConfigs = newConfigs;
+  loadWeekTT(ci, 0);
+}
+
+// Builds the shared "T=...|D=...|S=...|L=..." body (no version prefix) used by
+// both the single-week (v2) and multi-week (v3) seed formats. Returns
+// {error: [...]} if non-ASCII subjects were found, else {body: "..."}.
+function buildBody(periodsArr, daysArr, lessonsObj) {
+  const nonAscii = [];
+  daysArr.forEach(d => {
+    periodsArr.forEach((p, i) => {
+      if (p[2]) { return; }
+      const val = ((lessonsObj[d] && lessonsObj[d][i]) || "").trim();
+      if (val && !/^[\x20-\x7E]*$/.test(val)) {
+        nonAscii.push(`${DAY_NAMES[d]}, period ${i+1}: "${val}"`);
+      }
+    });
+  });
+  if (nonAscii.length) { return { error: nonAscii }; }
+
+  const tStr = "T=" + periodsArr.map(p => {
+    const start = timeToMinutes(p[0]).toString(36);
+    const end = timeToMinutes(p[1]).toString(36);
+    return `${start}-${end}${p[2] ? "B" : ""}`;
+  }).join(",");
+  const dStr = "D=" + daysArr.join(",");
+
+  const dictionary = [];
+  const indexOf = new Map();
+  function subjectIndex(subject) {
+    if (indexOf.has(subject)) { return indexOf.get(subject); }
+    const idx = dictionary.length;
+    dictionary.push(subject);
+    indexOf.set(subject, idx);
+    return idx;
+  }
+
+  const lStr = "L=" + daysArr.map(d => {
+    const codes = [];
+    periodsArr.forEach((p, i) => {
+      if (p[2]) { return; } // breaks get no slot at all
+      const val = ((lessonsObj[d] && lessonsObj[d][i]) || "").trim();
+      codes.push(val ? subjectIndex(val).toString(36) : "");
+    });
+    return `${d}:${codes.join(",")}`;
+  }).join(";");
+  const sStr = "S=" + dictionary.join(",");
+
+  return { body: [tStr, dStr, sStr, lStr].join("|") };
+}
+
+function timeToMinutes(hhmm) {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+}
+function minutesToHHMM(m) {
+  const hh = String(Math.floor(m / 60)).padStart(2, "0");
+  const mm = String(m % 60).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
+// Parses the compact v2 body (T=...|D=...|S=...|L=...).
+function parseSeedV2(body) {
+  const sections = body.split("|");
+  let tStr = null, dStr = null, sStr = null, lStr = null;
+  sections.forEach(s => {
+    if (s.startsWith("T=")) { tStr = s.slice(2); }
+    else if (s.startsWith("D=")) { dStr = s.slice(2); }
+    else if (s.startsWith("S=")) { sStr = s.slice(2); }
+    else if (s.startsWith("L=")) { lStr = s.slice(2); }
+  });
+  if (tStr === null || dStr === null || sStr === null || lStr === null) {
+    throw new Error("Missing T=, D=, S= or L= section.");
+  }
+
+  const newPeriods = tStr.split(",").filter(x => x.length).map(part => {
+    const brk = part.endsWith("B");
+    const clean = brk ? part.slice(0, -1) : part;
+    const range = clean.split("-");
+    if (range.length !== 2) { throw new Error(`Bad period: "${part}"`); }
+    const start = minutesToHHMM(parseInt(range[0], 36));
+    const end = minutesToHHMM(parseInt(range[1], 36));
+    return [start, end, brk];
+  });
+  if (newPeriods.length === 0) { throw new Error("No periods found."); }
+
+  const newDays = dStr.split(",").filter(x => x.length).map(x => {
+    const n = parseInt(x, 10);
+    if (isNaN(n) || n < 0 || n > 6) { throw new Error(`Bad day code: "${x}"`); }
+    return n;
+  });
+  if (newDays.length === 0) { throw new Error("No active days found."); }
+
+  const dictionary = sStr.length ? sStr.split(",") : [];
+
+  const newLessons = {};
+  lStr.split(";").filter(x => x.length).forEach(entry => {
+    const colon = entry.indexOf(":");
+    if (colon === -1) { throw new Error(`Bad lesson entry: "${entry}"`); }
+    const day = parseInt(entry.slice(0, colon), 10);
+    if (isNaN(day)) { throw new Error(`Bad day in lesson entry: "${entry}"`); }
+    const codes = entry.slice(colon + 1).length ? entry.slice(colon + 1).split(",") : [];
+
+    const arr = [];
+    let codeIdx = 0;
+    newPeriods.forEach(p => {
+      if (p[2]) { arr.push(""); return; }
+      const code = codes[codeIdx] || "";
+      codeIdx++;
+      arr.push(code.length ? (dictionary[parseInt(code, 36)] || "") : "");
+    });
+    newLessons[day] = arr;
+  });
+
+  return { periods: newPeriods, days: newDays, lessons: newLessons };
+}
+
+// Parses the old verbose seed (P=hh:mm-hh:mmB?,...|D=...|L=...), for loading
+// timetables created before the compact v2 format existed.
+function parseSeedV1(raw) {
+  const sections = raw.split("|");
+  let pStr = null, dStr = null, lStr = null;
+  sections.forEach(s => {
+    if (s.startsWith("P=")) { pStr = s.slice(2); }
+    else if (s.startsWith("D=")) { dStr = s.slice(2); }
+    else if (s.startsWith("L=")) { lStr = s.slice(2); }
+  });
+  if (pStr === null || dStr === null || lStr === null) {
+    throw new Error("Missing P=, D= or L= section.");
+  }
+
+  const newPeriods = pStr.split(",").filter(x => x.length).map(part => {
+    const brk = part.endsWith("B");
+    const clean = brk ? part.slice(0, -1) : part;
+    const range = clean.split("-");
+    if (range.length !== 2) { throw new Error(`Bad period: "${part}"`); }
+    return [range[0], range[1], brk];
+  });
+  if (newPeriods.length === 0) { throw new Error("No periods found."); }
+
+  const newDays = dStr.split(",").filter(x => x.length).map(x => {
+    const n = parseInt(x, 10);
+    if (isNaN(n) || n < 0 || n > 6) { throw new Error(`Bad day code: "${x}"`); }
+    return n;
+  });
+  if (newDays.length === 0) { throw new Error("No active days found."); }
+
+  const newLessons = {};
+  lStr.split(";").filter(x => x.length).forEach(entry => {
+    const colon = entry.indexOf(":");
+    if (colon === -1) { throw new Error(`Bad lesson entry: "${entry}"`); }
+    const day = parseInt(entry.slice(0, colon), 10);
+    if (isNaN(day)) { throw new Error(`Bad day in lesson entry: "${entry}"`); }
+    const subs = entry.slice(colon + 1).split(",");
+    newLessons[day] = subs;
+  });
+
+  return { periods: newPeriods, days: newDays, lessons: newLessons };
+}
+
+// Whole-timetable seed string (Timetable.mc's own "2|"/"3|"-prefixed format)
+// <-> tt state, for embedding one timetable category inside the outer SEED.
+function buildTimetableSeedString(tt) {
+  if (!tt.multiWeek) {
+    const result = buildBody(tt.periods, tt.activeDays, tt.lessons);
+    if (result.error) { throw new Error("the watch does not support non-English subjects: " + result.error.join("; ")); }
+    return "2|" + result.body;
+  }
+  if (tt.weekConfigs.length) {
+    tt.weekConfigs[tt.currentWeekIdx] = {
+      activeDays: tt.activeDays.slice(),
+      periods: tt.periods.map(p => p.slice()),
+      lessons: JSON.parse(JSON.stringify(tt.lessons)),
+      key: tt.weekConfigs[tt.currentWeekIdx].key,
+      label: tt.weekConfigs[tt.currentWeekIdx].label,
+    };
+  }
+  const parts = [];
+  for (const w of tt.weekConfigs) {
+    const result = buildBody(w.periods, w.activeDays, w.lessons);
+    if (result.error) { throw new Error(`week "${w.label}": the watch does not support non-English subjects: ` + result.error.join("; ")); }
+    parts.push(`${w.key}@${result.body}`);
+  }
+  return "3|" + parts.join("~");
+}
+
+function parseTimetableSeedString(raw) {
+  if (raw.startsWith("3|")) {
+    const entries = raw.slice(2).split("~").filter(x => x.length);
+    if (entries.length === 0) { throw new Error("No weeks found."); }
+    const weekConfigs = entries.map(entry => {
+      const at = entry.indexOf("@");
+      if (at === -1) { throw new Error(`Bad week entry: "${entry}"`); }
+      const key = parseInt(entry.slice(0, at), 10);
+      if (isNaN(key)) { throw new Error(`Bad week number in: "${entry}"`); }
+      const result = parseSeedV2(entry.slice(at + 1));
+      const year = Math.floor(key / 100);
+      const week = key % 100;
+      const approxStart = new Date(year, 0, 1 + (week - 1) * 7);
+      const approxEnd = new Date(approxStart);
+      approxEnd.setDate(approxEnd.getDate() + 6);
+      return {
+        activeDays: result.days.sort((a,b) => a - b),
+        periods: result.periods,
+        lessons: result.lessons,
+        key,
+        label: `Week ${week} (${formatDateShort(approxStart)}–${formatDateShort(approxEnd)})`
+      };
+    }).sort((a, b) => a.key - b.key);
+    const first = weekConfigs[0];
+    return {
+      multiWeek: true,
+      activeDays: first.activeDays.slice(),
+      periods: first.periods.map(p => p.slice()),
+      lessons: JSON.parse(JSON.stringify(first.lessons)),
+      weekConfigs,
+      currentWeekIdx: 0,
+    };
+  }
+
+  const result = raw.startsWith("2|") ? parseSeedV2(raw.slice(2)) : parseSeedV1(raw);
+  return {
+    multiWeek: false,
+    activeDays: result.days.sort((a,b) => a - b),
+    periods: result.periods,
+    lessons: result.lessons,
+    weekConfigs: [],
+    currentWeekIdx: 0,
+  };
+}
+
+// -- Rendering --
 
 function render() {
   const list = document.getElementById("categoriesList");
@@ -224,29 +723,120 @@ function render() {
     `;
     div.appendChild(head);
 
-    cat.items.forEach((item, ii) => {
-      const row = document.createElement("div");
-      row.className = "item-row";
-      row.innerHTML = `
-        <input class="label-input" type="text" value="${item.label.replace(/"/g,'&quot;')}" placeholder="Label" onchange="updateItem(${ci},${ii},'label',this.value)">
-        <input class="value-input" type="text" value="${item.value.replace(/"/g,'&quot;')}" placeholder="Value" onchange="updateItem(${ci},${ii},'value',this.value)">
-        <button class="btn-remove" onclick="removeItem(${ci},${ii})">✕</button>
-      `;
-      div.appendChild(row);
-    });
+    if (cat.type === "timetable") {
+      const body = document.createElement("div");
+      body.innerHTML = renderTimetableEditor(ci);
+      div.appendChild(body);
+    } else {
+      cat.items.forEach((item, ii) => {
+        const row = document.createElement("div");
+        row.className = "item-row";
+        row.innerHTML = `
+          <input class="label-input" type="text" value="${item.label.replace(/"/g,'&quot;')}" placeholder="Label (optional)" onchange="updateItem(${ci},${ii},'label',this.value)">
+          <input class="value-input" type="text" value="${item.value.replace(/"/g,'&quot;')}" placeholder="Value" onchange="updateItem(${ci},${ii},'value',this.value)">
+          <button class="btn-remove" onclick="removeItem(${ci},${ii})">✕</button>
+        `;
+        div.appendChild(row);
+      });
 
-    const addBtn = document.createElement("div");
-    addBtn.className = "actions-row";
-    addBtn.innerHTML = `<button class="btn-add" onclick="addItem(${ci})">+ Add item</button>`;
-    div.appendChild(addBtn);
+      const addBtn = document.createElement("div");
+      addBtn.className = "actions-row";
+      addBtn.innerHTML = `<button class="btn-add" onclick="addItem(${ci})">+ Add item</button>`;
+      div.appendChild(addBtn);
+    }
 
     list.appendChild(div);
   });
 }
 
+// Builds the timetable sub-editor's HTML for category `ci` (weekly-schedule
+// mode, school days, lesson periods, and the timetable grid) - ported from
+// the standalone School-timetable app's editor UI.
+function renderTimetableEditor(ci) {
+  const tt = categories[ci].tt;
+  initLessonsTT(ci);
+
+  let lessonNumber = 0;
+  const periodsHtml = tt.periods.map((p, i) => {
+    const isBreak = !!p[2];
+    const idxLabel = isBreak ? "☕" : ++lessonNumber;
+    return `
+      <div class="period-row">
+        <span class="idx">${idxLabel}</span>
+        <input type="time" value="${p[0]}" onchange="updatePeriodTT(${ci},${i},0,this.value)">
+        <span>—</span>
+        <input type="time" value="${p[1]}" onchange="updatePeriodTT(${ci},${i},1,this.value)">
+        <label class="break-label"><input type="checkbox" ${isBreak ? "checked" : ""} onchange="toggleBreakTT(${ci},${i},this.checked)"> Break</label>
+        <button class="btn-remove" onclick="removePeriodTT(${ci},${i})">✕</button>
+      </div>`;
+  }).join("");
+
+  const daysHtml = DAY_CODES.map(d =>
+    `<div class="day-toggle${tt.activeDays.includes(d) ? " active" : ""}" onclick="toggleDayTT(${ci},${d})">${DAY_NAMES[d]}</div>`
+  ).join("");
+
+  const gridHead = "<thead><tr><th>Time</th>" + tt.activeDays.map(d => `<th>${DAY_NAMES[d]}</th>`).join("") + "</tr></thead>";
+  const gridBody = "<tbody>" + tt.periods.map((p, i) => {
+    if (p[2]) {
+      return `<tr class="break-row"><td class="hourcell">${p[0]}-${p[1]}</td><td class="breakcell" colspan="${tt.activeDays.length}">☕ Break</td></tr>`;
+    }
+    let cells = `<td class="hourcell">${p[0]}-${p[1]}</td>`;
+    tt.activeDays.forEach(d => {
+      const val = (tt.lessons[d] && tt.lessons[d][i]) || "";
+      cells += `<td><input type="text" value="${val.replace(/"/g,'&quot;')}" placeholder="free" onchange="updateLessonTT(${ci},${d},${i},this.value)"></td>`;
+    });
+    return `<tr>${cells}</tr>`;
+  }).join("") + "</tbody>";
+
+  const weekModeHtml = `
+    <div class="days-row">
+      <div class="day-toggle${!tt.multiWeek ? " active" : ""}" onclick="setModeTT(${ci},false)">Same every week</div>
+      <div class="day-toggle${tt.multiWeek ? " active" : ""}" onclick="setModeTT(${ci},true)">Different each week</div>
+    </div>
+    ${tt.multiWeek ? `
+    <div style="margin-top:10px;">
+      <label>Weeks to configure:
+        <input type="number" id="weeksAheadInput-${ci}" min="1" max="8" value="${tt.weekConfigs.length || 2}" style="width:56px;">
+      </label>
+      <button class="btn-secondary" onclick="applyWeeksAheadTT(${ci})">Apply</button>
+    </div>
+    <div class="days-row" style="margin-top:10px;">
+      ${tt.weekConfigs.map((w,i) => `<div class="day-toggle${i === tt.currentWeekIdx ? " active" : ""}" onclick="weekTabClickTT(${ci},${i})">${w.label}</div>`).join("")}
+    </div>
+    <p class="hint">Each week is stored by its actual week-of-year number, so the schedule always matches the right calendar week.</p>
+    ` : ""}
+  `;
+
+  return `
+    <div class="sub-card">
+      <h3>Weekly schedule</h3>
+      ${weekModeHtml}
+    </div>
+    <div class="sub-card">
+      <h3>School days</h3>
+      <div class="days-row">${daysHtml}</div>
+    </div>
+    <div class="sub-card">
+      <h3>Lesson periods</h3>
+      <div class="periods-list">${periodsHtml}</div>
+      <div class="actions-row"><button class="btn-add" onclick="addPeriodTT(${ci})">+ Add period</button></div>
+    </div>
+    <div class="sub-card">
+      <h3>Timetable grid</h3>
+      <div class="table-wrap"><table>${gridHead}${gridBody}</table></div>
+      <p class="hint">Leave a cell empty if there's no lesson at that period.</p>
+    </div>
+  `;
+}
+
 function addCategory() {
   const color = DEFAULT_COLORS[categories.length % DEFAULT_COLORS.length];
-  categories.push({ name: "New category", color, items: [] });
+  categories.push({ name: "New category", color, type: "info", items: [] });
+  render();
+}
+function addTimetableCategory() {
+  const color = DEFAULT_COLORS[categories.length % DEFAULT_COLORS.length];
+  categories.push({ name: "Timetable", color, type: "timetable", tt: defaultTT() });
   render();
 }
 function removeCategory(ci) {
@@ -272,7 +862,7 @@ function updateItem(ci, ii, field, val) {
 }
 
 // Percent-encodes every character except the format's own unreserved set,
-// so free text can safely contain any of : , ; ~ | = without corrupting the seed.
+// so free text can safely contain any of : , ; ~ | = ^ without corrupting the seed.
 function encField(s) {
   return encodeURIComponent(s).replace(/[~!*'()]/g, c => "%" + c.charCodeAt(0).toString(16).toUpperCase());
 }
@@ -284,16 +874,21 @@ function hexColor(c) {
 }
 
 // SEED format: 1|C=<hex6>:<encName>,...|I=<catIdx>:<encLabel>~<encValue>,...;<catIdx>:...
+// A timetable category's C= entry is instead <hex6>:<encName>^<encTimetableSeed>,
+// where <encTimetableSeed> is a whole percent-encoded Timetable seed - see
+// buildTimetableSeedString(). Such categories never appear in I=.
 function generateSeed() {
   const box = document.getElementById("seedBox");
   const nonAscii = [];
   categories.forEach(cat => {
     if (!/^[\x20-\x7E]*$/.test(cat.name)) { nonAscii.push(`Category name: "${cat.name}"`); }
-    cat.items.forEach(item => {
-      if (!/^[\x20-\x7E]*$/.test(item.label) || !/^[\x20-\x7E]*$/.test(item.value)) {
-        nonAscii.push(`${cat.name}: "${item.label}" / "${item.value}"`);
-      }
-    });
+    if (cat.type === "info") {
+      cat.items.forEach(item => {
+        if (!/^[\x20-\x7E]*$/.test(item.label) || !/^[\x20-\x7E]*$/.test(item.value)) {
+          nonAscii.push(`${cat.name}: "${item.label}" / "${item.value}"`);
+        }
+      });
+    }
   });
   if (nonAscii.length) {
     box.style.color = "var(--danger)";
@@ -305,13 +900,28 @@ function generateSeed() {
     box.textContent = "Add at least one category first.";
     return;
   }
-  box.style.color = "";
 
-  const cStr = "C=" + categories.map(cat => `${hexColor(cat.color)}:${encField(cat.name)}`).join(",");
+  const cParts = [];
+  for (const cat of categories) {
+    let part = `${hexColor(cat.color)}:${encField(cat.name)}`;
+    if (cat.type === "timetable") {
+      let ttSeed;
+      try {
+        ttSeed = buildTimetableSeedString(cat.tt);
+      } catch (e) {
+        box.style.color = "var(--danger)";
+        box.textContent = `Error in "${cat.name}": ${e.message}`;
+        return;
+      }
+      part += "^" + encField(ttSeed);
+    }
+    cParts.push(part);
+  }
+  const cStr = "C=" + cParts.join(",");
 
   const iGroups = [];
   categories.forEach((cat, ci) => {
-    if (cat.items.length === 0) { return; }
+    if (cat.type !== "info" || cat.items.length === 0) { return; }
     const pairs = cat.items
       .filter(item => item.label.trim() !== "" || item.value.trim() !== "")
       .map(item => `${encField(item.label)}~${encField(item.value)}`);
@@ -319,8 +929,8 @@ function generateSeed() {
   });
   const iStr = "I=" + iGroups.join(";");
 
-  const seed = "1|" + [cStr, iStr].join("|");
-  box.textContent = seed;
+  box.style.color = "";
+  box.textContent = "1|" + [cStr, iStr].join("|");
 }
 
 function copySeed() {
@@ -339,9 +949,22 @@ function importSeed() {
     msg.textContent = "Paste a SEED code first.";
     return;
   }
+  // A bare timetable SEED from the old standalone School-timetable app
+  // (no "1|C=...|I=..." wrapper - just "2|...", "3|..." or the legacy
+  // unprefixed v1 format) is imported as one new timetable category added
+  // to the current list, instead of replacing everything.
   if (!raw.startsWith("1|")) {
-    msg.className = "error";
-    msg.textContent = "Unrecognized SEED format.";
+    try {
+      const tt = parseTimetableSeedString(raw);
+      const color = DEFAULT_COLORS[categories.length % DEFAULT_COLORS.length];
+      categories.push({ name: "Timetable", color, type: "timetable", tt });
+      render();
+      msg.className = "success";
+      msg.textContent = "Timetable SEED imported as a new category.";
+    } catch (e) {
+      msg.className = "error";
+      msg.textContent = "Unrecognized SEED format.";
+    }
     return;
   }
 
@@ -349,15 +972,23 @@ function importSeed() {
     const sections = raw.slice(2).split("|");
     let cStr = null, iStr = null;
     sections.forEach(s => {
-      if (s.startsWith("C=")) cStr = s.slice(2);
-      else if (s.startsWith("I=")) iStr = s.slice(2);
+      if (s.startsWith("C=")) { cStr = s.slice(2); }
+      else if (s.startsWith("I=")) { iStr = s.slice(2); }
     });
     if (cStr === null) { throw new Error("Missing C= section."); }
 
     const newCategories = cStr.length ? cStr.split(",").map(part => {
       const colon = part.indexOf(":");
       if (colon === -1) { throw new Error(`Bad category: "${part}"`); }
-      return { color: "#" + part.slice(0, colon).toLowerCase(), name: decField(part.slice(colon + 1)), items: [] };
+      const color = "#" + part.slice(0, colon).toLowerCase();
+      const rest = part.slice(colon + 1);
+      const hat = rest.indexOf("^");
+      if (hat === -1) {
+        return { color, name: decField(rest), type: "info", items: [] };
+      }
+      const name = decField(rest.slice(0, hat));
+      const tt = parseTimetableSeedString(decField(rest.slice(hat + 1)));
+      return { color, name, type: "timetable", tt };
     }) : [];
     if (newCategories.length === 0) { throw new Error("No categories found."); }
 
@@ -367,6 +998,7 @@ function importSeed() {
         if (colon === -1) { throw new Error(`Bad item group: "${group}"`); }
         const catIdx = parseInt(group.slice(0, colon), 10);
         if (isNaN(catIdx) || !newCategories[catIdx]) { throw new Error(`Bad category index: "${group}"`); }
+        if (newCategories[catIdx].type !== "info") { return; }
         const rest = group.slice(colon + 1);
         if (!rest.length) { return; }
         rest.split(",").forEach(pair => {

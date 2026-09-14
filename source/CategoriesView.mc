@@ -167,8 +167,21 @@ class CategoriesView extends WatchUi.View {
     function enter(idx as Number) as Void {
         cursor = idx;
         var cat = categories[idx];
+        if (cat.isTimetable) {
+            var timetable = cat.timetableSeed != null ? Timetable.parseSchedule(cat.timetableSeed as String) : null;
+            if (timetable == null) {
+                Alert.show("This timetable's SEED could not be read.", method(:noop));
+                return;
+            }
+            var ttView = new TimetableView(cat, timetable as Timetable);
+            WatchUi.pushView(ttView, new TimetableViewDelegate(ttView), WatchUi.SLIDE_LEFT);
+            return;
+        }
         var view = new ItemsView(cat);
         WatchUi.pushView(view, new ItemsDelegate(view, self), WatchUi.SLIDE_LEFT);
+    }
+
+    function noop() as Void {
     }
 
     // Best-guess text color for readable contrast against `bg` (0xRRGGBB).
