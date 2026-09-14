@@ -57,6 +57,20 @@ class CategoriesDelegate extends WatchUi.InputDelegate {
         view.addCategory(cat);
     }
 
+    function onSwipe(swipeEvent as WatchUi.SwipeEvent) as Boolean {
+        var dir = swipeEvent.getDirection();
+        if (dir == WatchUi.SWIPE_UP) {
+            view.move(1);
+            WatchUi.requestUpdate();
+            return true;
+        } else if (dir == WatchUi.SWIPE_DOWN) {
+            view.move(-1);
+            WatchUi.requestUpdate();
+            return true;
+        }
+        return false;
+    }
+
     // -- Entering a category: PIN-gated when it requires one --
 
     private function enterCategory(idx as Number) as Void {
