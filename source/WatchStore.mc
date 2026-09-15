@@ -8,6 +8,7 @@ import Toybox.Application.Storage;
 //  - whole categories created on the watch ("wsCategories")
 //  - items added on the watch into a category that came from the SEED
 //    ("wsSeedItems", keyed by that category's index within the SEED)
+(:background)
 class WatchStore {
 
     static function nextId() as Number {
@@ -150,6 +151,14 @@ class WatchStore {
         var item = new InfoItem(d["label"] as String, d["value"] as String);
         item.fromWatch = true;
         item.id = d["id"] as Number;
+        if (d.hasKey("rHour")) {
+            item.reminderHour = d["rHour"] as Number;
+            item.reminderMinute = d["rMinute"] as Number;
+            item.reminderDays = d.hasKey("rDays") ? (d["rDays"] as Array<Number>) : null;
+            item.reminderRepeat = d.hasKey("rRepeat") ? (d["rRepeat"] as Boolean) : false;
+            item.reminderVibe = d.hasKey("rVibe") ? (d["rVibe"] as Number) : 2;
+            item.reminderSound = d.hasKey("rSound") ? (d["rSound"] as Boolean) : true;
+        }
         return item;
     }
 
@@ -297,6 +306,55 @@ class WatchStore {
             if (label != null) { itemDict["label"] = label; }
             if (value != null) { itemDict["value"] = value; }
             Storage.setValue("wsSeedItems", seedItems);
+        }
+    }
+
+    // Persists item's reminder fields (already updated on the in-memory
+    // `item`) back to the item's dict. Only supported for non-requiresPin
+    // categories - a PIN-protected item's label/value live encrypted in
+    // "blob", which a background wake has no key to read (see
+    // ItemsDelegate.openItemMenu, which hides the reminder option there).
+    static function updateItemReminder(cat as InfoCategory, item as InfoItem) as Void {
+        if (!item.fromWatch || cat.requiresPin) {
+            return;
+        }
+        var itemDict = null;
+        var arr = null;
+        var seedItems = null;
+        if (cat.fromWatch) {
+            arr = Storage.getValue("wsCategories") as Array;
+            var catDict = findById(arr, cat.id as Number);
+            if (catDict == null) { return; }
+            itemDict = findById(catDict["items"] as Array, item.id as Number);
+        } else {
+            seedItems = Storage.getValue("wsSeedItems") as Dictionary?;
+            if (seedItems == null) { return; }
+            var idx = cat.seedIndex as Number;
+            if (!seedItems.hasKey(idx)) { return; }
+            itemDict = findById(seedItems[idx] as Array, item.id as Number);
+        }
+        if (itemDict == null) { return; }
+
+        if (item.reminderHour == null) {
+            itemDict.remove("rHour");
+            itemDict.remove("rMinute");
+            itemDict.remove("rDays");
+            itemDict.remove("rRepeat");
+            itemDict.remove("rVibe");
+            itemDict.remove("rSound");
+        } else {
+            itemDict["rHour"] = item.reminderHour;
+            itemDict["rMinute"] = item.reminderMinute;
+            itemDict["rDays"] = item.reminderDays;
+            itemDict["rRepeat"] = item.reminderRepeat;
+            itemDict["rVibe"] = item.reminderVibe;
+            itemDict["rSound"] = item.reminderSound;
+        }
+
+        if (cat.fromWatch) {
+            Storage.setValue("wsCategories", arr as Array);
+        } else {
+            Storage.setValue("wsSeedItems", seedItems as Dictionary);
         }
     }
 

@@ -173,13 +173,25 @@ class ItemsDelegate extends WatchUi.InputDelegate {
         var menu = new WatchUi.Menu2({ :title => title });
         menu.addItem(new WatchUi.MenuItem("Edit label", null, :editLabel, null));
         menu.addItem(new WatchUi.MenuItem("Edit value", null, :editValue, null));
+        // Reminders need to read the item's label/value from a background
+        // wake, which can't happen for a PIN-protected category (they stay
+        // encrypted at rest - see WatchStore.updateItemReminder).
+        if (Reminder.isSupported() && !view.category.requiresPin) {
+            var reminderLabel = item.reminderHour == null ? "Add reminder" : "Edit reminder";
+            menu.addItem(new WatchUi.MenuItem(reminderLabel, null, :reminder, null));
+        }
         menu.addItem(new WatchUi.MenuItem("Delete", null, :del, null));
         var actions = {
             :editLabel => method(:startEditItemLabel),
             :editValue => method(:startEditItemValue),
+            :reminder => method(:startEditItemReminder),
             :del => method(:confirmDeleteItem),
         };
         WatchUi.pushView(menu, new ActionMenuDelegate(actions), WatchUi.SLIDE_UP);
+    }
+
+    function startEditItemReminder() as Void {
+        new ReminderFlow(view.category, view.category.items[view.cursor]).start();
     }
 
     function startEditItemLabel() as Void {

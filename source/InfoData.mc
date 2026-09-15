@@ -1,6 +1,7 @@
 import Toybox.Lang;
 
 // One key/value entry inside a category (e.g. "WiFi password" / "hunter2").
+(:background)
 class InfoItem {
     var label as String;
     var value as String;
@@ -9,15 +10,38 @@ class InfoItem {
     var fromWatch as Boolean;
     var id as Number?; // set when fromWatch; identifies the row in WatchStore
 
+    // Optional reminder - only ever set on fromWatch items in a
+    // non-requiresPin category (PIN-protected items are encrypted at rest,
+    // so a background wake can't read their label/value - see Reminder.mc
+    // and ItemsDelegate.openItemMenu). null hour means "no reminder set".
+    var reminderHour as Number?;
+    var reminderMinute as Number?;
+    // Days of week to fire on, using Time.Gregorian's day_of_week numbering
+    // (1=Sunday..7=Saturday). Null or empty means "every day".
+    var reminderDays as Array<Number>?;
+    // False: fire once, then the reminder is cleared. True: fire again on
+    // the next matching day.
+    var reminderRepeat as Boolean;
+    // 0=off, 1=light, 2=medium, 3=strong - see Reminder.vibeProfileFor().
+    var reminderVibe as Number;
+    var reminderSound as Boolean;
+
     function initialize(l as String, v as String) {
         label = l;
         value = v;
         fromWatch = false;
         id = null;
+        reminderHour = null;
+        reminderMinute = null;
+        reminderDays = null;
+        reminderRepeat = false;
+        reminderVibe = 2;
+        reminderSound = true;
     }
 }
 
 // A colored group of items (e.g. "Passwords", colored blue).
+(:background)
 class InfoCategory {
     var name as String;
     var color as Number; // 0xRRGGBB
@@ -74,6 +98,7 @@ class InfoCategory {
 // where <encTTSeed> is a whole percent-encoded Timetable seed (Timetable.mc's
 // own "2|"/"3|"-prefixed format, ported from the standalone School-timetable
 // app). Such categories never appear in the I= section - see CategoriesView.enter().
+(:background)
 class InfoSeed {
 
     // Splits `s` on single-character delimiter `delim` (Monkey C's String has no split()).

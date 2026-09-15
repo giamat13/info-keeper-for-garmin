@@ -29,6 +29,10 @@ class PinKey {
 class PinPadView extends WatchUi.View {
 
     var entered as String = "";
+    // Masked "* * *" display for PIN entry (PinEntry.request). TimeEntry.show
+    // sets this false to show the typed digits themselves, and maxLen to 4.
+    var masked as Boolean = true;
+    var maxLen as Number = 12;
     private var keys as Array<PinKey> = [] as Array<PinKey>;
     private var headerH as Number = 0;
     private var safeX as Number = 0;
@@ -104,7 +108,7 @@ class PinPadView extends WatchUi.View {
     }
 
     function insertDigit(d as String) as Void {
-        if (entered.length() < 12) {
+        if (entered.length() < maxLen) {
             entered += d;
         }
     }
@@ -131,11 +135,15 @@ class PinPadView extends WatchUi.View {
         dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_DK_GRAY);
         dc.fillRectangle(safeX, safeY, safeW, headerH);
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        var dots = "";
-        for (var i = 0; i < entered.length(); i++) {
-            dots += "* ";
+        var display = "";
+        if (masked) {
+            for (var i = 0; i < entered.length(); i++) {
+                display += "* ";
+            }
+        } else {
+            display = entered;
         }
-        dc.drawText(safeX + safeW / 2, safeY + headerH / 2, Graphics.FONT_MEDIUM, dots, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(safeX + safeW / 2, safeY + headerH / 2, Graphics.FONT_MEDIUM, display, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         for (var i = 0; i < keys.size(); i++) {
             var b = keys[i];
