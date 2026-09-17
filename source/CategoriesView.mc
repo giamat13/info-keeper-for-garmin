@@ -177,6 +177,21 @@ class CategoriesView extends WatchUi.View {
             WatchUi.pushView(ttView, new TimetableViewDelegate(ttView), WatchUi.SLIDE_LEFT);
             return;
         }
+        if ("W".equals(cat.widget)) {
+            var wView = new WeatherMoonView(cat.widgetSeed);
+            WatchUi.pushView(wView, new WeatherMoonDelegate(wView), WatchUi.SLIDE_LEFT);
+            return;
+        }
+        if ("C".equals(cat.widget)) {
+            var config = CooldownConfig.parse(cat.widgetSeed);
+            if (config == null) {
+                Alert.show("This cooldown's SEED could not be read.", method(:noop));
+                return;
+            }
+            var cView = new EndyearcooldownView(config);
+            WatchUi.pushView(cView, new EndyearcooldownActiveDelegate(cView), WatchUi.SLIDE_LEFT);
+            return;
+        }
         var view = new ItemsView(cat);
         WatchUi.pushView(view, new ItemsDelegate(view, self), WatchUi.SLIDE_LEFT);
     }

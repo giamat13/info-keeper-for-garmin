@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>End Year Cooldown Setup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&display=swap" rel="stylesheet">
+<style>
+    :root {
+        color-scheme: dark;
+        --bg: #0b0d12;
+        --panel: #151822;
+        --panel-2: #1b1f2c;
+        --border: #2a2f3d;
+        --text: #eef0f5;
+        --muted: #8b93a7;
+        --accent: #5ee0c0;
+        --accent-dim: #2f6f61;
+        --danger: #ff8686;
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-tap-highlight-color: transparent; }
+    body {
+        background:
+            radial-gradient(1100px 500px at 15% -10%, rgba(94,224,192,0.14), transparent 60%),
+            radial-gradient(900px 400px at 100% 0%, rgba(93,140,255,0.10), transparent 55%),
+            var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        margin: 0;
+        padding: 40px 18px 72px;
+    }
+    .wrap {
+        max-width: 520px;
+        margin: 0 auto;
+    }
+    header.hero {
+        margin-bottom: 30px;
+    }
+    .eyebrow {
+        display: inline-block;
+        font-size: 0.72rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--accent);
+        background: rgba(94,224,192,0.10);
+        border: 1px solid rgba(94,224,192,0.25);
+        border-radius: 999px;
+        padding: 4px 12px;
+        margin-bottom: 14px;
+        font-weight: 600;
+    }
+    h1 {
+        font-family: "Bricolage Grotesque", sans-serif;
+        font-weight: 700;
+        font-size: clamp(1.6rem, 5vw, 2.15rem);
+        line-height: 1.15;
+        margin: 0 0 10px;
+        letter-spacing: -0.01em;
+    }
+    p.sub {
+        color: var(--muted);
+        margin: 0;
+        font-size: 0.98rem;
+        line-height: 1.55;
+        max-width: 46ch;
+    }
+    .card {
+        background: linear-gradient(180deg, var(--panel-2), var(--panel));
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 20px 20px 22px;
+        margin-bottom: 18px;
+        box-shadow: 0 1px 0 rgba(255,255,255,0.03) inset, 0 12px 30px -18px rgba(0,0,0,0.6);
+    }
+    .card-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+    .card-head .icon {
+        font-size: 1.1rem;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(94,224,192,0.10);
+        border-radius: 9px;
+        flex: 0 0 auto;
+    }
+    .card h2 {
+        font-family: "Bricolage Grotesque", sans-serif;
+        font-size: 1.02rem;
+        font-weight: 600;
+        margin: 0;
+        letter-spacing: -0.005em;
+    }
+    .card p.hint {
+        margin: -8px 0 16px;
+        color: var(--muted);
+        font-size: 0.83rem;
+        line-height: 1.5;
+    }
+    label {
+        display: block;
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-bottom: 6px;
+        font-weight: 500;
+    }
+    .field {
+        margin-bottom: 16px;
+    }
+    .field:last-child { margin-bottom: 0; }
+    input[type="date"],
+    input[type="number"],
+    input[type="time"],
+    select,
+    textarea {
+        width: 100%;
+        background: #0d0f16;
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 9px;
+        padding: 10px 12px;
+        font-size: 0.95rem;
+        font-family: inherit;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    input:focus, select:focus, textarea:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(94,224,192,0.15);
+    }
+    .day-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 9px 0;
+        border-bottom: 1px solid var(--border);
+    }
+    .day-row:last-child { border-bottom: none; }
+    .switch {
+        position: relative;
+        width: 40px;
+        height: 24px;
+        flex: 0 0 auto;
+    }
+    .switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+    .switch .track {
+        position: absolute; inset: 0;
+        background: #2a2f3d;
+        border-radius: 999px;
+        transition: background 0.15s ease;
+    }
+    .switch .thumb {
+        position: absolute;
+        top: 3px; left: 3px;
+        width: 18px; height: 18px;
+        background: #7b8296;
+        border-radius: 50%;
+        transition: transform 0.15s ease, background 0.15s ease;
+    }
+    .switch input:checked + .track { background: var(--accent-dim); }
+    .switch input:checked + .track + .thumb { transform: translateX(16px); background: var(--accent); }
+    .day-row .day-name {
+        flex: 1;
+        font-size: 0.92rem;
+        font-weight: 500;
+    }
+    .day-row.disabled .day-name { color: var(--muted); }
+    .day-row input[type="time"] {
+        width: 110px;
+        margin: 0;
+        flex: 0 0 auto;
+    }
+    .day-row.disabled input[type="time"] { opacity: 0.4; pointer-events: none; }
+    .swatches {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+    }
+    .swatch {
+        position: relative;
+        aspect-ratio: 1;
+        border-radius: 12px;
+        border: 2px solid transparent;
+        cursor: pointer;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        padding-bottom: 6px;
+    }
+    .swatch span {
+        font-size: 0.66rem;
+        font-weight: 600;
+        color: rgba(0,0,0,0.65);
+        text-shadow: 0 1px 0 rgba(255,255,255,0.2);
+    }
+    .swatch.selected { border-color: var(--text); box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--text); }
+    .swatch.rainbow { background: conic-gradient(red, orange, yellow, green, blue, violet, red); }
+    .swatch.rainbow span { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
+    .swatches.small {
+        grid-template-columns: repeat(8, 1fr);
+        gap: 6px;
+    }
+    .swatches.small .swatch span { display: none; }
+    .custom-row {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 14px;
+        margin-bottom: 14px;
+    }
+    .custom-row:last-child { margin-bottom: 0; }
+    .custom-row-head {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 12px;
+    }
+    .custom-row-head input[type="text"] { flex: 1; }
+    .recur-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 12px;
+    }
+    .recur-row label.inline {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.88rem;
+        color: var(--text);
+        margin: 0;
+        font-weight: 500;
+        cursor: pointer;
+    }
+    .recur-row input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--accent); }
+    .recur-row input[type="number"] { flex: 1; }
+    button.remove {
+        background: transparent;
+        color: var(--danger);
+        border: 1px solid rgba(255,134,134,0.35);
+        border-radius: 8px;
+        padding: 6px 10px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        flex: 0 0 auto;
+    }
+    button.remove:hover { border-color: var(--danger); }
+    #emptyCustomHint { color: var(--muted); font-size: 0.85rem; }
+    button {
+        background: var(--accent);
+        color: #06231d;
+        border: none;
+        border-radius: 10px;
+        padding: 12px 20px;
+        font-size: 0.95rem;
+        font-weight: 700;
+        font-family: "Bricolage Grotesque", sans-serif;
+        cursor: pointer;
+        transition: transform 0.08s ease, filter 0.15s ease;
+    }
+    button:hover { filter: brightness(1.08); }
+    button:active { transform: scale(0.98); }
+    button.secondary {
+        background: transparent;
+        color: var(--text);
+        border: 1px solid var(--border);
+        font-weight: 600;
+    }
+    button.secondary:hover { border-color: var(--accent); color: var(--accent); }
+    .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 14px;
+    }
+    textarea#seedOut, textarea#seedIn {
+        font-family: "SF Mono", "Consolas", monospace;
+        font-size: 0.82rem;
+        resize: vertical;
+        min-height: 64px;
+        color: var(--accent);
+    }
+    #status {
+        font-size: 0.85rem;
+        color: var(--muted);
+        min-height: 1.2em;
+        margin-top: 10px;
+    }
+    #status.ok { color: var(--accent); }
+    footer {
+        text-align: center;
+        color: var(--muted);
+        font-size: 0.78rem;
+        margin-top: 30px;
+    }
+    /* ?embed=1: shown inside a cooldown category of the Info Keeper editor
+       (index.html), which loads/reads the seed itself via loadSeed()/generateSeed(). */
+    body.embed { background: transparent; padding: 0; margin: 0; min-height: 0; }
+    body.embed .wrap { max-width: none; }
+    body.embed header.hero, body.embed footer,
+    body.embed .card:has(#seedIn), body.embed .card:has(#seedOut) { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+    <span class="eyebrow">Widget setup</span>
+    <h1>End Year Cooldown</h1>
+    <p class="sub">Build your school schedule, generate a seed, and paste it into the widget's "Cooldown Seed" setting in Garmin Connect.</p>
+</header>
+
+<div class="card">
+    <div class="card-head">
+        <div class="icon">📥</div>
+        <h2>Load an existing seed</h2>
+    </div>
+    <p class="hint">Paste a seed here to edit it in the form below.</p>
+    <textarea id="seedIn" placeholder="3|E=...|N=...|W=...|T=...|C=...|S=...|X=...|A=..."></textarea>
+    <div class="actions" style="margin-top:14px; margin-bottom:0;">
+        <button id="loadBtn" class="secondary">Load into form</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-head">
+        <div class="icon">📅</div>
+        <h2>School year</h2>
+    </div>
+    <p class="hint">No year - the widget figures out the right year on its own, every year.</p>
+    <div class="field">
+        <label for="officialEndMonth">Official last day of school</label>
+        <div style="display:flex; gap:10px;">
+            <select id="officialEndMonth" style="flex:2;"></select>
+            <input type="number" id="officialEndDay" min="1" max="31" value="1" style="flex:1;">
+        </div>
+    </div>
+    <div class="field">
+        <label for="nextYearStartMonth">First day of next school year</label>
+        <div style="display:flex; gap:10px;">
+            <select id="nextYearStartMonth" style="flex:2;"></select>
+            <input type="number" id="nextYearStartDay" min="1" max="31" value="1" style="flex:1;">
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-head">
+        <div class="icon">✨</div>
+        <h2>Custom dates</h2>
+    </div>
+    <p class="hint">Add extra countdowns for anything else - a trip, a holiday, whatever. Each can repeat every year or happen once.</p>
+    <div id="customDates"></div>
+    <div id="emptyCustomHint" style="display:none;">No custom dates yet.</div>
+    <div class="actions" style="margin-top:14px; margin-bottom:0;">
+        <button id="addCustomBtn" class="secondary">+ Add date</button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-head">
+        <div class="icon">🌙</div>
+        <h2>Sleep schedule</h2>
+    </div>
+    <p class="hint">Used to compute the "net" countdown for custom dates above - it subtracts sleep time from the raw countdown, same idea as net school time.</p>
+    <div id="sleepDays"></div>
+</div>
+
+<div class="card">
+    <div class="card-head">
+        <div class="icon">⏰</div>
+        <h2>School start time</h2>
+    </div>
+    <div class="field">
+        <label for="schoolStartTime">Time school starts every day</label>
+        <input type="time" id="schoolStartTime" value="08:00">
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-head">
+        <div class="icon">🗓️</div>
+        <h2>School days &amp; end times</h2>
+    </div>
+    <div id="days"></div>
+</div>
+
+<div class="card">
+    <div class="card-head">
+        <div class="icon">🎨</div>
+        <h2>Ring color</h2>
+    </div>
+    <div class="swatches" id="swatches"></div>
+</div>
+
+<div class="card">
+    <div class="card-head">
+        <div class="icon">🌱</div>
+        <h2>Seed</h2>
+    </div>
+    <div class="actions">
+        <button id="generateBtn">Generate seed</button>
+        <button id="copyBtn" class="secondary">Copy</button>
+    </div>
+    <textarea id="seedOut" readonly placeholder="Click Generate seed..."></textarea>
+    <div id="status"></div>
+</div>
+
+<footer>Everything lives in the seed — the watch has no other settings.</footer>
+
+</div>
+
+<script>
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const DEFAULT_ENABLED = [true, true, true, true, true, true, false]; // Saturday off by default
+const DEFAULT_END = ["14:00", "14:00", "14:00", "14:00", "14:00", "12:00", "14:00"]; // Friday 12:00
+const COLORS = [
+    { name: "Blue", hex: "#4d8dff" },
+    { name: "Red", hex: "#ff5a5a" },
+    { name: "Green", hex: "#4dd88a" },
+    { name: "Yellow", hex: "#ffd84d" },
+    { name: "Orange", hex: "#ff9a4d" },
+    { name: "Pink", hex: "#ff7ad1" },
+    { name: "Purple", hex: "#a25dff" },
+    { name: "Rainbow", hex: null }
+];
+
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"];
+
+function populateMonthSelect(select) {
+    MONTH_NAMES.forEach((name, i) => {
+        const opt = document.createElement("option");
+        opt.value = i + 1;
+        opt.textContent = name;
+        select.appendChild(opt);
+    });
+}
+populateMonthSelect(document.getElementById("officialEndMonth"));
+populateMonthSelect(document.getElementById("nextYearStartMonth"));
+document.getElementById("officialEndMonth").value = 6;
+document.getElementById("nextYearStartMonth").value = 9;
+
+let selectedColor = 0;
+
+const daysDiv = document.getElementById("days");
+DAY_NAMES.forEach((name, i) => {
+    const row = document.createElement("div");
+    row.className = "day-row" + (DEFAULT_ENABLED[i] ? "" : " disabled");
+    row.innerHTML = `
+        <label class="switch">
+            <input type="checkbox" id="enabled${i}" ${DEFAULT_ENABLED[i] ? "checked" : ""}>
+            <span class="track"></span>
+            <span class="thumb"></span>
+        </label>
+        <span class="day-name">${name}</span>
+        <input type="time" id="end${i}" value="${DEFAULT_END[i]}">
+    `;
+    daysDiv.appendChild(row);
+    row.querySelector(`#enabled${i}`).addEventListener("change", (e) => {
+        row.classList.toggle("disabled", !e.target.checked);
+    });
+});
+
+const DEFAULT_WAKE = "08:00";
+const DEFAULT_BED = "22:00";
+const sleepDaysDiv = document.getElementById("sleepDays");
+DAY_NAMES.forEach((name, i) => {
+    const row = document.createElement("div");
+    row.className = "day-row";
+    row.innerHTML = `
+        <span class="day-name">${name}</span>
+        <input type="time" id="wake${i}" value="${DEFAULT_WAKE}" style="width:110px; margin:0; flex:0 0 auto;">
+        <input type="time" id="bed${i}" value="${DEFAULT_BED}" style="width:110px; margin:0; flex:0 0 auto;">
+    `;
+    sleepDaysDiv.appendChild(row);
+});
+
+const swatchesDiv = document.getElementById("swatches");
+COLORS.forEach((c, i) => {
+    const el = document.createElement("div");
+    el.className = "swatch" + (c.hex === null ? " rainbow" : "") + (i === selectedColor ? " selected" : "");
+    el.dataset.value = i;
+    if (c.hex) { el.style.background = c.hex; }
+    el.innerHTML = `<span>${c.name}</span>`;
+    el.addEventListener("click", () => {
+        selectedColor = i;
+        swatchesDiv.querySelectorAll(".swatch").forEach(s => s.classList.remove("selected"));
+        el.classList.add("selected");
+    });
+    swatchesDiv.appendChild(el);
+});
+
+// ── Custom dates ─────────────────────────────────────────────────────────
+let customDates = []; // { id, name, month, day, recurring, year, time, color }
+let nextCustomId = 1;
+const customDatesDiv = document.getElementById("customDates");
+
+function addCustomDate(prefill) {
+    const cd = Object.assign({
+        id: nextCustomId++,
+        name: "",
+        month: 12,
+        day: 25,
+        recurring: true,
+        year: new Date().getFullYear(),
+        time: "00:00",
+        color: 0
+    }, prefill || {});
+    customDates.push(cd);
+    renderCustomDates();
+}
+
+function removeCustomDate(id) {
+    customDates = customDates.filter(cd => cd.id !== id);
+    renderCustomDates();
+}
+
+function renderCustomDates() {
+    customDatesDiv.innerHTML = "";
+    document.getElementById("emptyCustomHint").style.display = customDates.length ? "none" : "block";
+
+    customDates.forEach(cd => {
+        const row = document.createElement("div");
+        row.className = "custom-row";
+
+        const head = document.createElement("div");
+        head.className = "custom-row-head";
+        head.innerHTML = `<input type="text" placeholder="Name (e.g. School trip)" value="${cd.name.replace(/"/g, "&quot;")}">`;
+        const removeBtn = document.createElement("button");
+        removeBtn.className = "remove";
+        removeBtn.type = "button";
+        removeBtn.textContent = "Remove";
+        removeBtn.addEventListener("click", () => removeCustomDate(cd.id));
+        head.appendChild(removeBtn);
+        head.querySelector("input").addEventListener("input", (e) => {
+            cd.name = e.target.value.replace(/[~^|=]/g, "");
+        });
+        row.appendChild(head);
+
+        const dateField = document.createElement("div");
+        dateField.className = "field";
+        dateField.innerHTML = `<label>Date</label><div style="display:flex; gap:10px;">
+            <select style="flex:2;"></select>
+            <input type="number" min="1" max="31" value="${cd.day}" style="flex:1;">
+        </div>`;
+        const monthSelect = dateField.querySelector("select");
+        populateMonthSelect(monthSelect);
+        monthSelect.value = cd.month;
+        monthSelect.addEventListener("change", (e) => { cd.month = Number(e.target.value); });
+        dateField.querySelector("input[type=number]").addEventListener("input", (e) => { cd.day = Number(e.target.value); });
+        row.appendChild(dateField);
+
+        const recurRow = document.createElement("div");
+        recurRow.className = "recur-row";
+        recurRow.innerHTML = `
+            <label class="inline"><input type="checkbox" ${cd.recurring ? "checked" : ""}> Repeats every year</label>
+            <input type="number" placeholder="Year" value="${cd.year}" style="${cd.recurring ? "display:none;" : ""}">
+        `;
+        const recurCheckbox = recurRow.querySelector("input[type=checkbox]");
+        const yearInput = recurRow.querySelector("input[type=number]");
+        recurCheckbox.addEventListener("change", (e) => {
+            cd.recurring = e.target.checked;
+            yearInput.style.display = cd.recurring ? "none" : "";
+        });
+        yearInput.addEventListener("input", (e) => { cd.year = Number(e.target.value); });
+        row.appendChild(recurRow);
+
+        const timeField = document.createElement("div");
+        timeField.className = "field";
+        timeField.innerHTML = `<label>Countdown target time</label><input type="time" value="${cd.time}">`;
+        timeField.querySelector("input").addEventListener("input", (e) => { cd.time = e.target.value; });
+        row.appendChild(timeField);
+
+        const colorLabel = document.createElement("label");
+        colorLabel.textContent = "Color";
+        row.appendChild(colorLabel);
+        const swatches = document.createElement("div");
+        swatches.className = "swatches small";
+        COLORS.forEach((c, i) => {
+            const el = document.createElement("div");
+            el.className = "swatch" + (c.hex === null ? " rainbow" : "") + (i === cd.color ? " selected" : "");
+            if (c.hex) { el.style.background = c.hex; }
+            el.title = c.name;
+            el.innerHTML = `<span>${c.name}</span>`;
+            el.addEventListener("click", () => {
+                cd.color = i;
+                swatches.querySelectorAll(".swatch").forEach(s => s.classList.remove("selected"));
+                el.classList.add("selected");
+            });
+            swatches.appendChild(el);
+        });
+        row.appendChild(swatches);
+
+        customDatesDiv.appendChild(row);
+    });
+}
+
+document.getElementById("addCustomBtn").addEventListener("click", () => addCustomDate());
+renderCustomDates();
+
+function toBase36(n) {
+    return Math.max(0, Math.trunc(n)).toString(36);
+}
+
+function fromBase36(s) {
+    return parseInt(s, 36) || 0;
+}
+
+// Month/day encode as a single base36 value: month*100 + day. No year -
+// the watch works out the right year for itself, every year.
+function monthDayToCode(month, day) {
+    return month * 100 + day;
+}
+
+function codeToMonthDay(code) {
+    return [Math.floor(code / 100), code % 100];
+}
+
+function timeToMinutes(hhmm) {
+    const [h, m] = hhmm.split(":").map(Number);
+    return h * 60 + m;
+}
+
+function minutesToTime(mins) {
+    const h = String(Math.floor(mins / 60)).padStart(2, "0");
+    const m = String(mins % 60).padStart(2, "0");
+    return `${h}:${m}`;
+}
+
+function setStatus(text, ok) {
+    const status = document.getElementById("status");
+    status.textContent = text;
+    status.classList.toggle("ok", !!ok);
+}
+
+function generateSeed() {
+    const endMonth = Number(document.getElementById("officialEndMonth").value);
+    const endDay = Number(document.getElementById("officialEndDay").value);
+    const nextMonth = Number(document.getElementById("nextYearStartMonth").value);
+    const nextDay = Number(document.getElementById("nextYearStartDay").value);
+    if (!endDay || !nextDay) {
+        setStatus("Please fill in both dates.", false);
+        return;
+    }
+
+    const endCode = monthDayToCode(endMonth, endDay);
+    const nextCode = monthDayToCode(nextMonth, nextDay);
+    const startMinutes = timeToMinutes(document.getElementById("schoolStartTime").value);
+
+    let bitmask = 0;
+    const times = [];
+    for (let i = 0; i < 7; i++) {
+        const enabled = document.getElementById(`enabled${i}`).checked;
+        if (enabled) { bitmask |= (1 << i); }
+        times.push(toBase36(timeToMinutes(document.getElementById(`end${i}`).value)));
+    }
+
+    let seed = `3|E=${toBase36(endCode)}|N=${toBase36(nextCode)}|W=${bitmask}|T=${times.join(",")}|C=${selectedColor}|S=${toBase36(startMinutes)}`;
+
+    if (customDates.length) {
+        const entries = customDates.map(cd => {
+            const code = monthDayToCode(cd.month, cd.day);
+            const hasYear = cd.recurring ? 0 : 1;
+            const year = cd.recurring ? 0 : cd.year;
+            const endMinutes = timeToMinutes(cd.time);
+            return `${toBase36(code)}^${hasYear}^${toBase36(year)}^${toBase36(endMinutes)}^${cd.color}^${cd.name}`;
+        });
+        seed += `|X=${entries.join("~")}`;
+
+        const sleepDays = [];
+        for (let i = 0; i < 7; i++) {
+            const wake = timeToMinutes(document.getElementById(`wake${i}`).value);
+            const bed = timeToMinutes(document.getElementById(`bed${i}`).value);
+            sleepDays.push(`${toBase36(wake)}-${toBase36(bed)}`);
+        }
+        seed += `|A=${sleepDays.join(",")}`;
+    }
+
+    document.getElementById("seedOut").value = seed;
+    if (seed.length > 200) {
+        setStatus(`Seed generated (${seed.length} chars). This is long - if it doesn't save in Garmin Connect, trim a custom date.`, true);
+    } else {
+        setStatus("Seed generated. Copy it into the widget's Cooldown Seed setting.", true);
+    }
+}
+
+function loadSeed() {
+    const seed = document.getElementById("seedIn").value.trim();
+    if (!seed.startsWith("2|") && !seed.startsWith("3|")) {
+        setStatus("That doesn't look like a valid seed.", false);
+        return;
+    }
+
+    const sections = {};
+    seed.slice(2).split("|").forEach(part => {
+        const eq = part.indexOf("=");
+        if (eq === -1) { return; }
+        sections[part.slice(0, eq)] = part.slice(eq + 1);
+    });
+
+    if (!("E" in sections) || !("N" in sections) || !("W" in sections) || !("T" in sections) || !("C" in sections) || !("S" in sections)) {
+        setStatus("Seed is missing fields.", false);
+        return;
+    }
+
+    const [endMonth, endDay] = codeToMonthDay(fromBase36(sections.E));
+    const [nextMonth, nextDay] = codeToMonthDay(fromBase36(sections.N));
+    document.getElementById("officialEndMonth").value = endMonth;
+    document.getElementById("officialEndDay").value = endDay;
+    document.getElementById("nextYearStartMonth").value = nextMonth;
+    document.getElementById("nextYearStartDay").value = nextDay;
+    document.getElementById("schoolStartTime").value = minutesToTime(fromBase36(sections.S));
+
+    selectedColor = parseInt(sections.C, 10) || 0;
+    swatchesDiv.querySelectorAll(".swatch").forEach(s => s.classList.toggle("selected", Number(s.dataset.value) === selectedColor));
+
+    const bitmask = parseInt(sections.W, 10) || 0;
+    const times = sections.T.split(",");
+    for (let i = 0; i < 7; i++) {
+        const enabled = ((bitmask >> i) & 1) === 1;
+        const checkbox = document.getElementById(`enabled${i}`);
+        checkbox.checked = enabled;
+        checkbox.closest(".day-row").classList.toggle("disabled", !enabled);
+        if (times[i] !== undefined) {
+            document.getElementById(`end${i}`).value = minutesToTime(fromBase36(times[i]));
+        }
+    }
+
+    if (sections.A) {
+        const sleepDays = sections.A.split(",");
+        for (let i = 0; i < 7; i++) {
+            if (sleepDays[i] === undefined) { continue; }
+            const [wakeB36, bedB36] = sleepDays[i].split("-");
+            if (wakeB36 === undefined || bedB36 === undefined) { continue; }
+            document.getElementById(`wake${i}`).value = minutesToTime(fromBase36(wakeB36));
+            document.getElementById(`bed${i}`).value = minutesToTime(fromBase36(bedB36));
+        }
+    } else {
+        for (let i = 0; i < 7; i++) {
+            document.getElementById(`wake${i}`).value = DEFAULT_WAKE;
+            document.getElementById(`bed${i}`).value = DEFAULT_BED;
+        }
+    }
+
+    customDates = [];
+    if (sections.X) {
+        sections.X.split("~").forEach(entry => {
+            const parts = entry.split("^");
+            if (parts.length !== 6) { return; }
+            const [codeB36, hasYearB36, yearB36, endMinutesB36, colorStr, name] = parts;
+            const [month, day] = codeToMonthDay(fromBase36(codeB36));
+            addCustomDate({
+                name,
+                month,
+                day,
+                recurring: hasYearB36 !== "1",
+                year: fromBase36(yearB36),
+                time: minutesToTime(fromBase36(endMinutesB36)),
+                color: parseInt(colorStr, 10) || 0
+            });
+        });
+    } else {
+        renderCustomDates();
+    }
+
+    setStatus("Seed loaded into the form above.", true);
+}
+
+if (new URLSearchParams(location.search).has("embed")) {
+    document.body.classList.add("embed");
+}
+
+document.getElementById("generateBtn").addEventListener("click", generateSeed);
+document.getElementById("loadBtn").addEventListener("click", loadSeed);
+document.getElementById("copyBtn").addEventListener("click", () => {
+    const out = document.getElementById("seedOut");
+    if (!out.value) { return; }
+    out.select();
+    navigator.clipboard.writeText(out.value).then(() => {
+        setStatus("Copied to clipboard.", true);
+    }).catch(() => {
+        document.execCommand("copy");
+        setStatus("Copied to clipboard.", true);
+    });
+});
+</script>
+
+</body>
+</html>

@@ -295,6 +295,8 @@
     <div class="actions-row">
       <button class="btn-add" onclick="addCategory()">+ Add category</button>
       <button class="btn-add" onclick="addTimetableCategory()">+ Add timetable category</button>
+      <button class="btn-add" onclick="addWeatherCategory()">+ Add weather category</button>
+      <button class="btn-add" onclick="addCooldownCategory()">+ Add end-of-year cooldown</button>
     </div>
   </div>
 
@@ -314,7 +316,12 @@ const DAY_NAMES = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const DAY_CODES = [0,1,2,3,4,5,6];
 
 // categories = [{ name, color, type: "info", items: [{label, value}] }
-//              |{ name, color, type: "timetable", tt: {...} }]
+//              |{ name, color, type: "timetable", tt: {...} }
+//              |{ name, color, type: "weather", lat, lon, fahrenheit }
+//              |{ name, color, type: "cooldown", cdSeed, frame }]
+// A cooldown category's editor is web/cooldown.html (the standalone
+// end-year-cooldown-garmin editor) in an iframe; `cdSeed` holds its last
+// generated seed so re-rendering (which recreates the iframe) keeps it.
 let categories = [
   { name: "Passwords", color: "#38bdf8", type: "info", items: [{ label: "WiFi home", value: "" }] },
   { name: "IDs", color: "#22c55e", type: "info", items: [{ label: "ID number", value: "" }] },
@@ -707,7 +714,23 @@ function parseTimetableSeedString(raw) {
 
 // -- Rendering --
 
+// Pulls the current seed out of each cooldown iframe before it's destroyed
+// (render) or needed (generateSeed). Returns an error message, or null.
+function syncCooldowns() {
+  for (const cat of categories) {
+    if (cat.type !== "cooldown" || !cat.frame || !cat.frame.contentWindow || !cat.frame.contentWindow.generateSeed) { continue; }
+    const w = cat.frame.contentWindow;
+    const out = w.document.getElementById("seedOut");
+    out.value = "";
+    w.generateSeed();
+    if (!out.value) { return `"${cat.name}": ` + w.document.getElementById("status").textContent; }
+    cat.cdSeed = out.value;
+  }
+  return null;
+}
+
 function render() {
+  syncCooldowns();
   const list = document.getElementById("categoriesList");
   list.innerHTML = "";
   categories.forEach((cat, ci) => {
@@ -727,6 +750,35 @@ function render() {
       const body = document.createElement("div");
       body.innerHTML = renderTimetableEditor(ci);
       div.appendChild(body);
+    } else if (cat.type === "weather") {
+      const body = document.createElement("div");
+      body.className = "sub-card";
+      body.innerHTML = `
+        <h3>Weather &amp; moon</h3>
+        <p class="hint">Uses the watch's GPS. The location below is only a fallback until GPS gets a fix (empty = Tel Aviv).</p>
+        <div class="item-row">
+          <input class="label-input" type="number" step="any" min="-90" max="90" value="${cat.lat}" placeholder="Fallback latitude" onchange="categories[${ci}].lat=this.value">
+          <input class="value-input" type="number" step="any" min="-180" max="180" value="${cat.lon}" placeholder="Fallback longitude" onchange="categories[${ci}].lon=this.value">
+        </div>
+        <label class="break-label"><input type="checkbox" ${cat.fahrenheit ? "checked" : ""} onchange="categories[${ci}].fahrenheit=this.checked"> Use Fahrenheit</label>
+      `;
+      div.appendChild(body);
+    } else if (cat.type === "cooldown") {
+      const frame = document.createElement("iframe");
+      frame.src = "cooldown.html?embed=1";
+      frame.style.cssText = "width:100%;border:0;display:block;min-height:400px;";
+      frame.onload = () => {
+        const w = frame.contentWindow;
+        if (cat.cdSeed) {
+          w.document.getElementById("seedIn").value = cat.cdSeed;
+          w.loadSeed();
+        }
+        const fit = () => { frame.style.height = w.document.documentElement.scrollHeight + "px"; };
+        new w.ResizeObserver(fit).observe(w.document.body);
+        fit();
+      };
+      cat.frame = frame;
+      div.appendChild(frame);
     } else {
       cat.items.forEach((item, ii) => {
         const row = document.createElement("div");
@@ -839,6 +891,16 @@ function addTimetableCategory() {
   categories.push({ name: "Timetable", color, type: "timetable", tt: defaultTT() });
   render();
 }
+function addWeatherCategory() {
+  const color = DEFAULT_COLORS[categories.length % DEFAULT_COLORS.length];
+  categories.push({ name: "Weather", color, type: "weather", lat: "", lon: "", fahrenheit: false });
+  render();
+}
+function addCooldownCategory() {
+  const color = DEFAULT_COLORS[categories.length % DEFAULT_COLORS.length];
+  categories.push({ name: "School end", color, type: "cooldown", cdSeed: "" });
+  render();
+}
 function removeCategory(ci) {
   categories.splice(ci, 1);
   render();
@@ -877,8 +939,16 @@ function hexColor(c) {
 // A timetable category's C= entry is instead <hex6>:<encName>^<encTimetableSeed>,
 // where <encTimetableSeed> is a whole percent-encoded Timetable seed - see
 // buildTimetableSeedString(). Such categories never appear in I=.
+// Weather/cooldown categories are <hex6>:<encName>!W<encSub> / !C<encSub>
+// (sub = "<lat>;<lon>;<0|1 fahrenheit>" / the cooldown editor's own seed).
 function generateSeed() {
   const box = document.getElementById("seedBox");
+  const cdError = syncCooldowns();
+  if (cdError) {
+    box.style.color = "var(--danger)";
+    box.textContent = "Error in " + cdError;
+    return;
+  }
   const nonAscii = [];
   categories.forEach(cat => {
     if (!/^[\x20-\x7E]*$/.test(cat.name)) { nonAscii.push(`Category name: "${cat.name}"`); }
@@ -914,6 +984,10 @@ function generateSeed() {
         return;
       }
       part += "^" + encField(ttSeed);
+    } else if (cat.type === "weather") {
+      part += "!W" + encField(`${String(cat.lat).trim()};${String(cat.lon).trim()};${cat.fahrenheit ? 1 : 0}`);
+    } else if (cat.type === "cooldown") {
+      part += "!C" + encField(cat.cdSeed);
     }
     cParts.push(part);
   }
@@ -982,6 +1056,16 @@ function importSeed() {
       if (colon === -1) { throw new Error(`Bad category: "${part}"`); }
       const color = "#" + part.slice(0, colon).toLowerCase();
       const rest = part.slice(colon + 1);
+      const bang = rest.indexOf("!");
+      if (bang !== -1) {
+        const name = decField(rest.slice(0, bang));
+        const sub = decField(rest.slice(bang + 2));
+        if (rest[bang + 1] === "W") {
+          const [lat = "", lon = "", f = "0"] = sub.split(";");
+          return { color, name, type: "weather", lat, lon, fahrenheit: f === "1" };
+        }
+        return { color, name, type: "cooldown", cdSeed: sub };
+      }
       const hat = rest.indexOf("^");
       if (hat === -1) {
         return { color, name: decField(rest), type: "info", items: [] };

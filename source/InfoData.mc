@@ -70,6 +70,13 @@ class InfoCategory {
     // ItemsView for these.
     var isTimetable as Boolean;
     var timetableSeed as String?;
+    // Embedded mini-app categories (ported from standalone apps): "W" =
+    // weather (WeatherMoonView, from Weather-for-garmin), "C" = end-of-year
+    // cooldown (EndyearcooldownView, from end-year-cooldown-garmin), or null.
+    // `widgetSeed` is that mini-app's own settings string. Like timetables,
+    // `items` is always empty - see CategoriesView.enter().
+    var widget as String?;
+    var widgetSeed as String;
 
     function initialize(n as String, c as Number, i as Array<InfoItem>) {
         name = n;
@@ -83,6 +90,8 @@ class InfoCategory {
         favorite = false;
         isTimetable = false;
         timetableSeed = null;
+        widget = null;
+        widgetSeed = "";
     }
 }
 
@@ -96,6 +105,10 @@ class InfoCategory {
 // where <encTTSeed> is a whole percent-encoded Timetable seed (Timetable.mc's
 // own "2|"/"3|"-prefixed format, ported from the standalone School-timetable
 // app). Such categories never appear in the I= section - see CategoriesView.enter().
+//
+// Likewise <hex6>:<encName>!<W|C><encSubSeed> is a weather / cooldown
+// category (see InfoCategory.widget). `!` is always percent-encoded in
+// names, so it can't be confused with one.
 class InfoSeed {
 
     // Splits `s` on single-character delimiter `delim` (Monkey C's String has no split()).
@@ -167,6 +180,8 @@ class InfoSeed {
             var cPart = InfoSeed.toBase16(cat.color) + ":" + InfoSeed.percentEncode(cat.name);
             if (cat.isTimetable && cat.timetableSeed != null) {
                 cPart += "^" + InfoSeed.percentEncode(cat.timetableSeed as String);
+            } else if (cat.widget != null) {
+                cPart += "!" + cat.widget + InfoSeed.percentEncode(cat.widgetSeed);
             }
             cParts.add(cPart);
         }
@@ -175,7 +190,7 @@ class InfoSeed {
         var iGroups = [] as Array<String>;
         for (var i = 0; i < categories.size(); i++) {
             var cat = categories[i];
-            if (cat.isTimetable || cat.items.size() == 0) { continue; }
+            if (cat.isTimetable || cat.widget != null || cat.items.size() == 0) { continue; }
             var pairs = [] as Array<String>;
             for (var j = 0; j < cat.items.size(); j++) {
                 var item = cat.items[j];
@@ -244,9 +259,15 @@ class InfoSeed {
                 var color = InfoSeed.fromBase16(part.substring(0, colon) as String);
                 var rest = part.substring(colon + 1, part.length()) as String;
                 var caret = rest.find("^");
+                var bang = rest.find("!");
                 var name = "";
                 var cat = null;
-                if (caret == null) {
+                if (bang != null && bang + 1 < rest.length()) {
+                    name = InfoSeed.percentDecode(rest.substring(0, bang) as String);
+                    cat = new InfoCategory(name, color, [] as Array<InfoItem>);
+                    cat.widget = rest.substring(bang + 1, bang + 2);
+                    cat.widgetSeed = InfoSeed.percentDecode(rest.substring(bang + 2, rest.length()) as String);
+                } else if (caret == null) {
                     name = InfoSeed.percentDecode(rest);
                     cat = new InfoCategory(name, color, [] as Array<InfoItem>);
                 } else {
