@@ -1,7 +1,6 @@
 import Toybox.Lang;
 
 // One key/value entry inside a category (e.g. "WiFi password" / "hunter2").
-(:background)
 class InfoItem {
     var label as String;
     var value as String;
@@ -41,7 +40,6 @@ class InfoItem {
 }
 
 // A colored group of items (e.g. "Passwords", colored blue).
-(:background)
 class InfoCategory {
     var name as String;
     var color as Number; // 0xRRGGBB
@@ -98,7 +96,6 @@ class InfoCategory {
 // where <encTTSeed> is a whole percent-encoded Timetable seed (Timetable.mc's
 // own "2|"/"3|"-prefixed format, ported from the standalone School-timetable
 // app). Such categories never appear in the I= section - see CategoriesView.enter().
-(:background)
 class InfoSeed {
 
     // Splits `s` on single-character delimiter `delim` (Monkey C's String has no split()).

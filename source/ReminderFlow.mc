@@ -184,7 +184,7 @@ class ReminderFlow {
         item.reminderVibe = draftVibe;
         item.reminderSound = draftSound;
         WatchStore.updateItemReminder(category, item);
-        Reminder.rescheduleNext();
+        Reminder.syncFromStore();
     }
 
     function remove() as Void {
@@ -192,7 +192,7 @@ class ReminderFlow {
         item.reminderMinute = null;
         item.reminderDays = null;
         WatchStore.updateItemReminder(category, item);
-        Reminder.rescheduleNext();
+        Reminder.syncFromStore();
     }
 
 }

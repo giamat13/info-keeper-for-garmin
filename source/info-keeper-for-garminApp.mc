@@ -9,31 +9,40 @@ class info_keeper_for_garminApp extends Application.AppBase {
         AppBase.initialize();
     }
 
-    function onStart(state as Dictionary?) as Void {
-        Reminder.rescheduleNext();
-    }
+    // Set once getInitialView() runs - onStart/onStop also run in the
+    // background process, which must stay light (see Reminder.mc).
+    private var inForeground as Boolean = false;
 
+    // Covers every edit made during this session (item text changed,
+    // item/category deleted...) in one place.
     function onStop(state as Dictionary?) as Void {
-        Reminder.rescheduleNext();
+        if (inForeground) {
+            Reminder.syncFromStore();
+        }
     }
 
-    // Called when a reminder fires while the app happens to be open (the
-    // background wake already vibrated/prompted - see
-    // Reminder.fireDueAndReschedule). Nothing to show once the app itself
-    // isn't running yet, e.g. right after launch from the wake prompt -
-    // getInitialView() below will just show current data as usual.
+    // Background wake fired one-shot reminders: `data` is their item ids.
+    // Clear them from WatchStore so they don't come back on the next sync.
+    // Delivered right away if the app is open, else on next launch.
+    (:typecheck(disableBackgroundCheck))
     function onBackgroundData(data as PropertyValueType) as Void {
         if (data == null) {
             return;
         }
-        var fired = data as Dictionary;
-        var label = fired["label"] as String;
-        var value = fired["value"] as String;
-        var text = label.equals("") ? value : (label + ": " + value);
-        Alert.show(text, method(:noop));
-    }
-
-    function noop() as Void {
+        var ids = data as Array<Number>;
+        var categories = WatchStore.loadAll();
+        for (var c = 0; c < categories.size(); c++) {
+            var cat = categories[c];
+            for (var i = 0; i < cat.items.size(); i++) {
+                var item = cat.items[i];
+                if (item.fromWatch && item.reminderHour != null && ids.indexOf(item.id) >= 0) {
+                    item.reminderHour = null;
+                    item.reminderMinute = null;
+                    item.reminderDays = null;
+                    WatchStore.updateItemReminder(cat, item);
+                }
+            }
+        }
     }
 
     (:background)
@@ -41,7 +50,10 @@ class info_keeper_for_garminApp extends Application.AppBase {
         return [ new ReminderBackgroundService() ];
     }
 
+    (:typecheck(disableBackgroundCheck))
     function getInitialView() as [Views] or [Views, InputDelegates] {
+        inForeground = true;
+        Reminder.syncFromStore();
         // Phone SEED merged with whatever was created directly on the watch
         // (categories and/or items) - see WatchStore.loadAll().
         var categories = WatchStore.loadAll();

@@ -8,7 +8,6 @@ import Toybox.Application.Storage;
 //  - whole categories created on the watch ("wsCategories")
 //  - items added on the watch into a category that came from the SEED
 //    ("wsSeedItems", keyed by that category's index within the SEED)
-(:background)
 class WatchStore {
 
     static function nextId() as Number {

@@ -4,17 +4,28 @@ import Toybox.Time;
 import Toybox.Time.Gregorian;
 import Toybox.Background;
 import Toybox.Attention;
+import Toybox.Notifications;
+import Toybox.Application.Storage;
 
 // Schedules and fires per-item reminders (InfoItem.reminderHour etc).
 //
+// The background process only gets a small memory pool (64KB on most
+// watches) and 30s, so it never touches WatchStore/InfoSeed. Instead the
+// foreground (syncFromStore) flattens every reminder into a compact
+// "rmList" Storage array, and the background (rescheduleNext /
+// fireDueAndReschedule) reads just that.
+//
 // Only one Background temporal event can be registered at a time (Connect IQ
-// restriction), so rescheduleNext() always looks at every reminder across
-// every category and (re-)registers a single wake for whichever one is
-// soonest. It's called both from the foreground app (after a reminder is
-// added/edited/removed, and on launch) and from the background service
-// itself after firing, so the "next soonest" wake is always kept current.
+// restriction), so rescheduleNext() always registers a single wake for
+// whichever reminder is soonest.
+//
+// All times are LOCAL: built from Time.today() (local midnight) plus an
+// offset. Gregorian.moment() would treat hour/minute as UTC and fire hours
+// off in any non-UTC timezone.
 (:background)
 class Reminder {
+
+    private static const LIST_KEY = "rmList";
 
     // Gates any UI that offers reminders - see ItemsDelegate.openItemMenu.
     static function isSupported() as Boolean {
@@ -32,19 +43,20 @@ class Reminder {
         return [] as Array;
     }
 
+    // Local-time Moment for hour:minute, `dayOffset` days from today.
+    private static function localMoment(dayOffset as Number, hour as Number, minute as Number) as Time.Moment {
+        return Time.today().add(new Time.Duration(dayOffset * 86400 + hour * 3600 + minute * 60));
+    }
+
     // The next Moment (strictly after now) at hour:minute on one of `days`
     // (Time.Gregorian day_of_week values, 1=Sunday..7=Saturday), or any day
     // if `days` is null/empty. Always returns something within a week.
     static function nextTriggerMoment(hour as Number, minute as Number, days as Array<Number>?) as Time.Moment {
         var now = Time.now();
         for (var offset = 0; offset < 8; offset++) {
-            var day = now.add(new Time.Duration(offset * 86400));
-            var info = Gregorian.info(day, Time.FORMAT_SHORT);
-            var candidate = Gregorian.moment({
-                :year => info.year, :month => info.month, :day => info.day,
-                :hour => hour, :minute => minute, :second => 0,
-            });
-            if (daysMatch(days, info.day_of_week) && candidate.greaterThan(now)) {
+            var candidate = localMoment(offset, hour, minute);
+            var dow = Gregorian.info(localMoment(offset, 12, 0), Time.FORMAT_SHORT).day_of_week;
+            if (daysMatch(days, dow) && candidate.greaterThan(now)) {
                 return candidate;
             }
         }
@@ -63,94 +75,141 @@ class Reminder {
         return false;
     }
 
-    // True if hour:minute on today's matching day, and it's within the last
-    // 5 minutes - the slack a background wake can land after its target.
-    private static function isDueNow(item as InfoItem, now as Time.Moment) as Boolean {
-        var info = Gregorian.info(now, Time.FORMAT_SHORT);
-        if (!daysMatch(item.reminderDays, info.day_of_week)) {
+    // True if hour:minute today (on a matching day) is at most 10 minutes
+    // ago - the slack a background wake can land after its target (the
+    // 5-minute minimum between temporal events can push it later) - and
+    // after the previous wake (`last`, epoch secs), so it never fires twice.
+    private static function isDueNow(r as Dictionary, now as Time.Moment, last as Number?) as Boolean {
+        var dow = Gregorian.info(now, Time.FORMAT_SHORT).day_of_week;
+        if (!daysMatch(r["d"] as Array<Number>?, dow)) {
             return false;
         }
-        var target = Gregorian.moment({
-            :year => info.year, :month => info.month, :day => info.day,
-            :hour => item.reminderHour, :minute => item.reminderMinute, :second => 0,
-        });
+        var target = localMoment(0, r["h"] as Number, r["m"] as Number);
         if (now.lessThan(target)) {
             return false;
         }
-        return now.subtract(target).value() <= 300;
+        if (last != null && target.value() <= last) {
+            return false;
+        }
+        return now.subtract(target).value() <= 600;
     }
 
-    // Re-registers the single next background wake across every reminder in
-    // every non-PIN category, or leaves nothing registered if there are
-    // none. Safe to call often - it's cheap and idempotent.
-    static function rescheduleNext() as Void {
+    // Foreground only: flattens every reminder (non-PIN categories) into
+    // Storage "rmList" and re-registers the next wake. Call after anything
+    // that could change reminders, their items' text, or delete them.
+    (:typecheck(disableBackgroundCheck))
+    static function syncFromStore() as Void {
         if (!isSupported()) {
             return;
         }
+        var list = [] as Array<Dictionary>;
         var categories = WatchStore.loadAll();
-        var soonest = null;
         for (var c = 0; c < categories.size(); c++) {
             var cat = categories[c];
             if (cat.requiresPin) { continue; }
             for (var i = 0; i < cat.items.size(); i++) {
                 var item = cat.items[i];
                 if (item.reminderHour == null) { continue; }
-                var next = nextTriggerMoment(item.reminderHour as Number, item.reminderMinute as Number, item.reminderDays);
+                var title = item.label.equals("") ? item.value : item.label;
+                var body = item.label.equals("") ? "" : item.value;
+                if (title.length() > 60) { title = title.substring(0, 60); }
+                if (body.length() > 100) { body = body.substring(0, 100); }
+                list.add({
+                    "id" => item.id, "h" => item.reminderHour, "m" => item.reminderMinute,
+                    "d" => item.reminderDays, "r" => item.reminderRepeat,
+                    "v" => item.reminderVibe, "s" => item.reminderSound,
+                    "t" => title, "b" => body,
+                });
+            }
+        }
+        Storage.setValue(LIST_KEY, list);
+        rescheduleNext();
+    }
+
+    // Re-registers the single next background wake across "rmList", or
+    // clears it if there are none. Cheap - safe in the background.
+    static function rescheduleNext() as Void {
+        if (!isSupported()) {
+            return;
+        }
+        var list = Storage.getValue(LIST_KEY) as Array<Dictionary>?;
+        var soonest = null;
+        if (list != null) {
+            for (var i = 0; i < list.size(); i++) {
+                var r = list[i];
+                var next = nextTriggerMoment(r["h"] as Number, r["m"] as Number, r["d"] as Array<Number>?);
                 if (soonest == null || next.lessThan(soonest as Time.Moment)) {
                     soonest = next;
                 }
             }
         }
-        if (soonest != null) {
-            try {
-                Background.registerForTemporalEvent(soonest as Time.Moment);
-            } catch (e instanceof Background.InvalidBackgroundTimeException) {
-                // Too soon after the last event (< 5 min) - the next
-                // rescheduleNext() call will pick this back up.
-            }
+        if (soonest == null) {
+            Background.deleteTemporalEvent();
+            return;
+        }
+        try {
+            Background.registerForTemporalEvent(soonest as Time.Moment);
+        } catch (e) {
+            // Too soon after the last event (< 5 min) - the system fires it
+            // as soon as allowed, or the next rescheduleNext() picks it up.
         }
     }
 
-    // Runs on a background wake: fires (vibrates + requests an app-open
-    // prompt for) every reminder due right now, clears the one-shot ones,
-    // and re-registers the next wake. Returns a short summary for
-    // AppBase.onBackgroundData() to show if the app happens to be open.
-    static function fireDueAndReschedule() as Dictionary? {
-        var categories = WatchStore.loadAll();
+    // Runs on a background wake: shows a notification (or an app-open
+    // prompt on older watches) plus vibration/tone for every reminder due
+    // now, drops one-shot ones from "rmList", and re-registers the next
+    // wake. Returns the fired one-shot item ids so the foreground can clear
+    // them from WatchStore (AppBase.onBackgroundData), or null.
+    static function fireDueAndReschedule() as Array<Number>? {
+        var list = Storage.getValue(LIST_KEY) as Array<Dictionary>?;
+        if (list == null) {
+            return null;
+        }
         var now = Time.now();
-        var fired = null;
-        for (var c = 0; c < categories.size(); c++) {
-            var cat = categories[c];
-            if (cat.requiresPin) { continue; }
-            for (var i = 0; i < cat.items.size(); i++) {
-                var item = cat.items[i];
-                if (item.reminderHour == null || !isDueNow(item, now)) { continue; }
-
-                var vibe = vibeProfileFor(item.reminderVibe);
-                if (vibe.size() > 0 && (Toybox has :Attention) && (Attention has :vibrate)) {
-                    Attention.vibrate(vibe);
-                }
-                var text = item.label.equals("") ? item.value : (item.label + ": " + item.value);
-                if (text.length() > 120) {
-                    text = text.substring(0, 120);
-                }
-                try {
-                    Background.requestApplicationWake(text);
-                } catch (e instanceof Background.MessageSizeLimitException) {
-                }
-                if (fired == null) {
-                    fired = { "label" => item.label, "value" => item.value };
-                }
-
-                if (!item.reminderRepeat) {
-                    item.reminderHour = null;
-                    item.reminderMinute = null;
-                    item.reminderDays = null;
-                    WatchStore.updateItemReminder(cat, item);
-                }
+        var last = Storage.getValue("rmLast") as Number?;
+        Storage.setValue("rmLast", now.value());
+        var keep = [] as Array<Dictionary>;
+        var cleared = [] as Array<Number>;
+        for (var i = 0; i < list.size(); i++) {
+            var r = list[i];
+            if (!isDueNow(r, now, last)) {
+                keep.add(r);
+                continue;
+            }
+            notify(r);
+            if (r["r"] as Boolean) {
+                keep.add(r);
+            } else {
+                cleared.add(r["id"] as Number);
             }
         }
+        if (cleared.size() > 0) {
+            Storage.setValue(LIST_KEY, keep);
+        }
         rescheduleNext();
-        return fired;
+        return cleared.size() > 0 ? cleared : null;
+    }
+
+    private static function notify(r as Dictionary) as Void {
+        var title = r["t"] as String;
+        var body = r["b"] as String;
+        if (Toybox has :Attention) {
+            var vibe = vibeProfileFor(r["v"] as Number);
+            if (vibe.size() > 0 && (Attention has :vibrate)) {
+                Attention.vibrate(vibe);
+            }
+            if ((r["s"] as Boolean) && (Attention has :playTone)) {
+                Attention.playTone(Attention.TONE_ALARM);
+            }
+        }
+        if (Toybox has :Notifications) {
+            Notifications.showNotification(title, body, { :body => body });
+            return;
+        }
+        var text = body.equals("") ? title : (title + ": " + body);
+        try {
+            Background.requestApplicationWake(text);
+        } catch (e) {
+        }
     }
 }
