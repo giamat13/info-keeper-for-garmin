@@ -9,7 +9,7 @@
             "manifest": "${workspaceFolder}/manifest.xml",
             "jungleFiles": "${workspaceFolder}/monkey.jungle",
             "device": "vivoactive5",
-            "developerKeyPath": "${workspaceFolder}/developer_key.der"
+            "developerKeyPath": "C:/Users/furst/code/garmin_unified_developer_key.der"
         }
     ]
 }
